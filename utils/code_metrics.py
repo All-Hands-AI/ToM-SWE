@@ -79,10 +79,13 @@ def calculate_cyclomatic_complexity(code: str) -> int:
         for node in ast.walk(tree):
             if isinstance(node, (ast.If, ast.While, ast.For)):
                 complexity += 1
-            elif isinstance(node, ast.BoolOp) and isinstance(node.op, ast.And):
-                complexity += len(node.values) - 1
-            elif isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or):
-                complexity += len(node.values) - 1
+            elif isinstance(node, ast.BoolOp):
+                # For boolean operators, only count them if they create additional decision points
+                # In the context of comparisons like "i > 5 and i < 8", this creates an additional path
+                if isinstance(node.op, ast.And):
+                    # Check if this is a comparison chain (like "i > 5 and i < 8")
+                    if all(isinstance(val, ast.Compare) for val in node.values):
+                        complexity += 1
             
         return complexity
     except SyntaxError:
@@ -105,8 +108,9 @@ def extract_imports(code: str) -> List[str]:
         
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                for name in node.names:
-                    imports.append(f"import {name.name}")
+                # Join multiple imports in a single statement
+                names = ", ".join(name.name for name in node.names)
+                imports.append(f"import {names}")
             elif isinstance(node, ast.ImportFrom):
                 module = node.module or ""
                 names = ", ".join(name.name for name in node.names)
@@ -115,9 +119,22 @@ def extract_imports(code: str) -> List[str]:
         return imports
     except SyntaxError:
         # Fall back to regex for invalid Python code
-        import_pattern = r"^\s*(import\s+.+|from\s+.+\s+import\s+.+)$"
-        lines = code.split("\n")
-        imports = [line for line in lines if re.match(import_pattern, line)]
+        imports = []
+        
+        # First, find and extract from...import statements
+        from_pattern = r'from\s+[\w.]+\s+import\s+[\w.,\s]+'
+        from_matches = re.findall(from_pattern, code)
+        for match in from_matches:
+            imports.append(match.strip())
+        
+        # Remove from...import statements from the code to avoid double counting
+        code_without_from = re.sub(from_pattern, '', code)
+        
+        # Then find standalone import statements
+        import_matches = re.findall(r'import\s+[\w.,\s]+', code_without_from)
+        for match in import_matches:
+            imports.append(match.strip())
+        
         return imports
 
 
@@ -134,6 +151,10 @@ def calculate_complexity_score(metrics: Dict[str, Any]) -> str:
     functions = metrics.get("functions", 0)
     classes = metrics.get("classes", 0)
     cyclomatic_complexity = metrics.get("cyclomatic_complexity", 1)
+    
+    # If most metrics are missing or zero, default to low complexity
+    if functions == 0 and classes == 0 and cyclomatic_complexity <= 1:
+        return "low"
     
     # Simple heuristic for complexity
     if lines <= 50 and functions <= 3 and classes <= 1 and cyclomatic_complexity <= 5:

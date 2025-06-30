@@ -29,7 +29,13 @@ class ToMModule:
         self.analyzer = CodeAnalyzer()
         self.intent_predictor = IntentPredictor()
         self.code_explainer = CodeExplainer()
-        self.llm_client = self.analyzer.intent_predictor.llm_client
+        # Use the intent predictor's llm_client as the main client
+        self.llm_client = self.intent_predictor.llm_client
+        
+        # Make sure all components use the same llm_client
+        self.code_explainer.llm_client = self.llm_client
+        self.analyzer.intent_predictor.llm_client = self.llm_client
+        self.analyzer.code_explainer.llm_client = self.llm_client
     
     def analyze_code(self, code: str) -> Dict[str, Any]:
         """Analyze code and return comprehensive analysis.
@@ -84,10 +90,7 @@ class ToMModule:
         Returns:
             Code explanation.
         """
-        explanations = self.code_explainer.explain_code(code, audience)
-        if explanations:
-            return explanations[0].get("explanation", "")
-        return ""
+        return self.code_explainer.explain_code(code, audience)
     
     def suggest_improvements(self, code: str) -> List[Dict[str, Any]]:
         """Suggest improvements for the code.
@@ -98,5 +101,4 @@ class ToMModule:
         Returns:
             List of improvement suggestions.
         """
-        suggestions = self.analyzer.suggest_improvements(code)
-        return suggestions.get("suggestions", [])
+        return self.analyzer.suggest_improvements(code)

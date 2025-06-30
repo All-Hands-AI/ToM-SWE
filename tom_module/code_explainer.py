@@ -39,6 +39,18 @@ class CodeExplainer:
         logger.info("Code explanation generated")
         return explanation
 
+    def explain_code(self, code: str, audience: str = "general") -> str:
+        """Explain code for a specific audience (alias for explain method).
+        
+        Args:
+            code: The code to explain.
+            audience: Target audience (e.g., "beginner", "expert").
+            
+        Returns:
+            String explanation of the code.
+        """
+        return self.explain(code, audience)
+
     def suggest_improvements(self, code: str) -> List[Dict[str, Any]]:
         """Suggest improvements for the code.
         

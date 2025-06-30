@@ -11,6 +11,7 @@ from utils.code_metrics import (
     count_functions,
     count_classes,
     calculate_cyclomatic_complexity,
+    calculate_complexity_score,
 )
 
 logger = logging.getLogger(__name__)
@@ -93,6 +94,17 @@ class CodeAnalyzer:
         """
         return self.code_explainer.suggest_improvements(code)
 
+    def calculate_metrics(self, code: str) -> Dict[str, Any]:
+        """Calculate basic code metrics (public interface).
+        
+        Args:
+            code: The code to analyze.
+            
+        Returns:
+            Dict containing code metrics.
+        """
+        return self._calculate_metrics(code)
+
     def _calculate_metrics(self, code: str) -> Dict[str, Any]:
         """Calculate basic code metrics.
         
@@ -102,12 +114,17 @@ class CodeAnalyzer:
         Returns:
             Dict containing code metrics.
         """
-        return {
+        metrics = {
             "lines": count_lines(code),
             "functions": count_functions(code),
             "classes": count_classes(code),
             "cyclomatic_complexity": calculate_cyclomatic_complexity(code),
         }
+        
+        # Add complexity score
+        metrics["complexity"] = calculate_complexity_score(metrics)
+        
+        return metrics
 
     def _analyze_ast(self, code: str) -> Dict[str, Any]:
         """Analyze code using AST.
