@@ -3,14 +3,13 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from tom_swe.tom_module import ToMModule
-from tom_swe.utils.configure_llm import LLMConfig
+from tom_module.tom_module import ToMModule, LLMConfig
 
 
 @pytest.fixture
 def mock_llm_client():
     """Create a mock LLM client."""
-    with patch('tom_swe.tom_module.LLMClient') as mock_client:
+    with patch('utils.llm_client.LLMClient') as mock_client:
         # Configure the mock to return a specific response
         instance = mock_client.return_value
         instance.generate.return_value = '{"summary": "Test summary", "complexity": "low"}'

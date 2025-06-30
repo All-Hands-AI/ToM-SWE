@@ -1,7 +1,7 @@
 """Tests for utility functions."""
 
 import pytest
-from tom_swe.utils import (
+from utils.code_metrics import (
     count_lines, count_functions, count_classes,
     extract_imports, extract_function_names, extract_class_names,
     calculate_complexity

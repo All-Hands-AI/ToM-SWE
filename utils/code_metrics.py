@@ -142,3 +142,81 @@ def calculate_complexity_score(metrics: Dict[str, Any]) -> str:
         return "medium"
     else:
         return "high"
+
+
+def extract_function_names(code: str) -> List[str]:
+    """Extract function names from code.
+    
+    Args:
+        code: The code to analyze.
+        
+    Returns:
+        List of function names.
+    """
+    if not code:
+        return []
+    
+    try:
+        tree = ast.parse(code)
+        names = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                names.append(node.name)
+        return names
+    except SyntaxError:
+        # Fallback to regex if AST parsing fails
+        pattern = r'def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\('
+        matches = re.findall(pattern, code)
+        return matches
+
+
+def extract_class_names(code: str) -> List[tuple]:
+    """Extract class names and their base classes from code.
+    
+    Args:
+        code: The code to analyze.
+        
+    Returns:
+        List of tuples (class_name, base_classes).
+    """
+    if not code:
+        return []
+    
+    try:
+        tree = ast.parse(code)
+        classes = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                base_names = []
+                for base in node.bases:
+                    if isinstance(base, ast.Name):
+                        base_names.append(base.id)
+                classes.append((node.name, base_names))
+        return classes
+    except SyntaxError:
+        # Fallback to regex if AST parsing fails
+        pattern = r'class\s+([a-zA-Z_][a-zA-Z0-9_]*)'
+        matches = re.findall(pattern, code)
+        return [(match, []) for match in matches]
+
+
+def calculate_complexity(code: str) -> Dict[str, Any]:
+    """Calculate overall complexity metrics for code.
+    
+    Args:
+        code: The code to analyze.
+        
+    Returns:
+        Dictionary containing complexity metrics.
+    """
+    metrics = {
+        "lines": count_lines(code),
+        "functions": count_functions(code),
+        "classes": count_classes(code),
+        "cyclomatic_complexity": calculate_cyclomatic_complexity(code)
+    }
+    
+    complexity_score = calculate_complexity_score(metrics)
+    metrics["complexity"] = complexity_score
+    
+    return metrics

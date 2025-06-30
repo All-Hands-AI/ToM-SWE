@@ -5,7 +5,7 @@ import pytest
 import tempfile
 import json
 
-from tom_swe.database import Database
+from database import Database
 
 
 @pytest.fixture

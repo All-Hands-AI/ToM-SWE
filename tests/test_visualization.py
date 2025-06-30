@@ -5,18 +5,17 @@ import pytest
 import tempfile
 from unittest.mock import patch, MagicMock
 
-from tom_swe.visualization.display_trajectory import (
+from visualization.complexity_visualizer import (
     plot_complexity_over_time,
     plot_complexity_distribution,
     plot_function_vs_class_count,
     save_plots_to_html
 )
-
-from tom_swe.visualization.user_interaction_analysis import (
+from visualization.user_behavior_visualizer import (
     analyze_user_edits,
     track_user_behavior,
     visualize_user_behavior,
-    generate_user_behavior_report
+    generate_behavior_report as generate_user_behavior_report
 )
 
 

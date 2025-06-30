@@ -12,14 +12,14 @@ class TestCodeAnalyzer(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.analyzer = CodeAnalyzer()
-        self.test_code = """
+        self.test_code = '''
 def hello(name="World"):
     """Print a greeting message."""
     print(f"Hello, {name}!")
 
 hello()
 hello("Alice")
-"""
+'''
 
     @patch('tom_module.intent_predictor.IntentPredictor.predict_intent')
     def test_analyze(self, mock_predict_intent):
