@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}ToM-SWE - Conversation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>Conversation with User {{ user_id }}</h2>
+        <p>Conversation ID: {{ conversation_id }}</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>Conversation History</h5>
+            </div>
+            <div class="card-body">
+                <div class="conversation-container">
+                    {% for message in messages %}
+                    <div class="message {% if message.sender == 'user' %}user-message{% else %}system-message{% endif %}">
+                        <div class="message-header">
+                            <strong>{{ message.sender|title }}</strong>
+                            <span class="text-muted">{{ message.timestamp }}</span>
+                        </div>
+                        <div class="message-content">
+                            {{ message.content }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>New Message</h5>
+            </div>
+            <div class="card-body">
+                <form action="/conversation/{{ conversation_id }}/send" method="post">
+                    <div class="mb-3">
+                        <textarea class="form-control" id="message" name="message" rows="3" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Conversation Analysis</h5>
+            </div>
+            <div class="card-body">
+                <h6>Intent Recognition</h6>
+                <div class="progress mb-3">
+                    <div class="progress-bar" role="progressbar" style="width: {{ intent_confidence }}%;" aria-valuenow="{{ intent_confidence }}" aria-valuemin="0" aria-valuemax="100">{{ intent_confidence }}%</div>
+                </div>
+                <p><strong>Detected Intent:</strong> {{ detected_intent }}</p>
+                
+                <h6>Sentiment Analysis</h6>
+                <div class="progress mb-3">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ sentiment_positive }}%;" aria-valuenow="{{ sentiment_positive }}" aria-valuemin="0" aria-valuemax="100">{{ sentiment_positive }}%</div>
+                </div>
+                <p><strong>Overall Sentiment:</strong> {{ overall_sentiment }}</p>
+                
+                <h6>Topic Distribution</h6>
+                <canvas id="topicChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Topic distribution chart
+    const topicData = {
+        labels: {{ topic_labels|safe }},
+        datasets: [{
+            label: 'Topic Distribution',
+            data: {{ topic_values|safe }},
+            backgroundColor: [
+                'rgba(255, 99, 132, 0.2)',
+                'rgba(54, 162, 235, 0.2)',
+                'rgba(255, 206, 86, 0.2)',
+                'rgba(75, 192, 192, 0.2)',
+                'rgba(153, 102, 255, 0.2)'
+            ],
+            borderColor: [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)'
+            ],
+            borderWidth: 1
+        }]
+    };
+
+    // Create the topic chart
+    const topicCtx = document.getElementById('topicChart').getContext('2d');
+    new Chart(topicCtx, {
+        type: 'doughnut',
+        data: topicData,
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
+
+{% block head %}
+<style>
+    .conversation-container {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .message {
+        margin-bottom: 15px;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    
+    .user-message {
+        background-color: #f8f9fa;
+        border-left: 4px solid #007bff;
+    }
+    
+    .system-message {
+        background-color: #e9ecef;
+        border-left: 4px solid #6c757d;
+    }
+    
+    .message-header {
+        margin-bottom: 5px;
+    }
+    
+    .message-content {
+        white-space: pre-wrap;
+    }
+</style>
+{% endblock %}

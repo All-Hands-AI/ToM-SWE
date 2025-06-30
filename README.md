@@ -22,50 +22,47 @@ pip install -e .
 ## Usage
 
 ```python
-from tom_swe import ToMModule
+from tom_module.analyzer import CodeAnalyzer
+from visualization.trajectory_viewer import plot_trajectory
 
-# Initialize the module
-tom = ToMModule()
+# Initialize the analyzer
+analyzer = CodeAnalyzer()
 
 # Analyze code
 code = """
 def hello_world():
     print("Hello, world!")
 """
-analysis = tom.analyze_code(code)
+analysis = analyzer.analyze(code)
 
 # Understand intent
-intent = tom.understand_intent(code)
+intent = analyzer.understand_intent(code)
 
-# Explain code
-explanation = tom.explain_code(code, audience="beginner")
-
-# Suggest improvements
-suggestions = tom.suggest_improvements(code)
+# Visualize trajectory
+trajectory_data = [
+    {"timestamp": "2023-06-15T10:00:00", "analysis": analysis},
+    # More snapshots...
+]
+plot_trajectory(trajectory_data, "user_123")
 ```
 
-## Components
+## Project Structure
 
-- `tom_swe/`: Main package
-  - `core.py`: Core functionality
-  - `tom_module.py`: Theory of Mind module
-  - `database.py`: Database functionality
-  - `utils/`: Utility functions
-  - `visualization/`: Visualization tools
-  - `templates/`: HTML templates for web interface
-- `tests/`: Test suite
+- `data/`: Contains user data and analysis results
+- `templates/`: HTML templates for the web interface
+- `test_typing/`: Type checking tests
+- `tests/`: Unit and integration tests
+- `tom_module/`: Core Theory of Mind functionality
+- `utils/`: Utility functions and helpers
+- `visualization/`: Tools for visualizing code trajectories
 
-## Web Interface
+## Experiments
 
-The package includes a web interface for interacting with the ToM-SWE functionality:
+See [EXPERIMENT_LOG.md](EXPERIMENT_LOG.md) for details on our experiments and findings.
 
-```python
-from tom_swe.visualization.web_trajectory_viewer import TrajectoryViewer
+## RAG Agent
 
-# Create and run the viewer
-viewer = TrajectoryViewer()
-viewer.run()
-```
+We've implemented a Retrieval-Augmented Generation agent to enhance code understanding. See [RAG_AGENT_SUMMARY.md](RAG_AGENT_SUMMARY.md) for details.
 
 ## License
 

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}ToM-SWE - Error{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error</h4>
+            <p>{{ message }}</p>
+            <hr>
+            <p class="mb-0">Please go back and try again.</p>
+        </div>
+        <a href="/" class="btn btn-primary">Return to Home</a>
+    </div>
+</div>
+{% endblock %}
