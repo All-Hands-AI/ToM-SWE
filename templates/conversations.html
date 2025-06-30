@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}ToM-SWE - Conversations{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>Conversations for User {{ user_id }}</h2>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>Conversation History</h5>
+            </div>
+            <div class="card-body">
+                {% if conversations %}
+                <div class="list-group">
+                    {% for conversation in conversations %}
+                    <a href="/conversation/{{ conversation.id }}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">Conversation {{ conversation.id }}</h5>
+                            <small>{{ conversation.timestamp }}</small>
+                        </div>
+                        <p class="mb-1">{{ conversation.summary }}</p>
+                        <small>{{ conversation.message_count }} messages</small>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p>No conversations found for this user.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Start New Conversation</h5>
+            </div>
+            <div class="card-body">
+                <form action="/conversation/new" method="post">
+                    <input type="hidden" name="user_id" value="{{ user_id }}">
+                    <div class="mb-3">
+                        <label for="initial_message" class="form-label">Initial Message</label>
+                        <textarea class="form-control" id="initial_message" name="initial_message" rows="3" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Start Conversation</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>Conversation Statistics</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="conversationStatsChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Conversation statistics chart
+    const statsData = {
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        datasets: [{
+            label: 'Conversations',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1,
+            data: [3, 5, 2, 7, 4, 6]
+        }]
+    };
+
+    // Create the statistics chart
+    const statsCtx = document.getElementById('conversationStatsChart').getContext('2d');
+    new Chart(statsCtx, {
+        type: 'bar',
+        data: statsData,
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

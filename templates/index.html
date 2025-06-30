@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}ToM-SWE - Home{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="jumbotron">
+            <h1 class="display-4">Theory of Mind for Software Engineering</h1>
+            <p class="lead">Analyze and visualize code trajectories using Theory of Mind principles.</p>
+            <hr class="my-4">
+            <p>Select a user to view their code trajectory analysis.</p>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Available Users</h5>
+            </div>
+            <div class="card-body">
+                {% if users %}
+                <ul class="list-group">
+                    {% for user in users %}
+                    <li class="list-group-item">
+                        <a href="/user/{{ user }}">User {{ user }}</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p>No user data available.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Upload New Data</h5>
+            </div>
+            <div class="card-body">
+                <form action="/upload" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="user_id" class="form-label">User ID</label>
+                        <input type="text" class="form-control" id="user_id" name="user_id" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="data_file" class="form-label">Data File (JSON)</label>
+                        <input type="file" class="form-control" id="data_file" name="data_file" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="activityChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Sample data for the activity chart
+    const activityData = {
+        labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
+        datasets: [{
+            label: 'User Activity',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1,
+            data: [65, 59, 80, 81, 56, 55, 40]
+        }]
+    };
+
+    // Create the activity chart
+    const activityCtx = document.getElementById('activityChart').getContext('2d');
+    new Chart(activityCtx, {
+        type: 'bar',
+        data: activityData,
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
