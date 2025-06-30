@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}ToM-SWE: Home{% endblock %}
+
+{% block content %}
+<div class="px-4 py-5 my-5 text-center">
+    <h1 class="display-5 fw-bold">Theory of Mind for Software Engineering</h1>
+    <div class="col-lg-8 mx-auto">
+        <p class="lead mb-4">
+            ToM-SWE is a platform that applies Theory of Mind principles to software engineering tasks,
+            helping developers understand code better through advanced analysis and visualization.
+        </p>
+        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+            <a href="/analyze" class="btn btn-primary btn-lg px-4 gap-3">Analyze Code</a>
+            <a href="/visualize" class="btn btn-outline-secondary btn-lg px-4">View Visualizations</a>
+        </div>
+    </div>
+</div>
+
+<div class="row align-items-md-stretch">
+    <div class="col-md-6">
+        <div class="h-100 p-5 text-bg-dark rounded-3">
+            <h2>Code Analysis</h2>
+            <p>
+                Upload your code or paste it directly to get detailed analysis including complexity metrics,
+                potential issues, and suggestions for improvement.
+            </p>
+            <a href="/analyze" class="btn btn-outline-light">Try Code Analysis</a>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="h-100 p-5 bg-light border rounded-3">
+            <h2>Visualizations</h2>
+            <p>
+                Explore visual representations of code complexity, user interactions, and development trajectories
+                to gain deeper insights into your software engineering process.
+            </p>
+            <a href="/visualize" class="btn btn-outline-secondary">View Visualizations</a>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-12">
+        <h2 class="text-center mb-4">Features</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Code Analysis</h5>
+                <p class="card-text">
+                    Get detailed metrics and insights about your code, including complexity analysis,
+                    function and class detection, and potential issues.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">User Interaction Tracking</h5>
+                <p class="card-text">
+                    Track how users interact with code over time, analyzing edit patterns and
+                    development trajectories.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Visualization Tools</h5>
+                <p class="card-text">
+                    Visualize code complexity, user behavior, and development patterns through
+                    interactive charts and graphs.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -12,12 +12,47 @@ authors = [
 ]
 license = {text = "MIT"}
 requires-python = ">=3.8"
+dependencies = [
+    "matplotlib>=3.5.0",
+    "numpy>=1.20.0",
+    "flask>=2.0.0",
+    "sqlite3>=0.0.0; python_version < '3.12'",  # Built-in for Python 3.12+
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=6.0",
     "pytest-cov>=2.12",
+    "black>=22.0.0",
+    "isort>=5.10.0",
+    "mypy>=0.910",
+]
+llm = [
+    "openai>=1.0.0",
+    "anthropic>=0.5.0",
+]
+web = [
+    "flask>=2.0.0",
+    "gunicorn>=20.1.0",
+]
+all = [
+    "tom_swe[dev,llm,web]",
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tom_swe/tests"]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 88
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true

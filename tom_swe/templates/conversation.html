@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}ToM-SWE: Conversation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>Code Conversation</h2>
+        <p class="lead">Interact with the code analysis system to understand your code better.</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Code</h5>
+            </div>
+            <div class="card-body">
+                <div class="code-container">{{ code }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Analysis</h5>
+            </div>
+            <div class="card-body">
+                <div class="analysis-container">
+                    <h6>Summary</h6>
+                    <p>{{ analysis.summary }}</p>
+                    
+                    <h6>Complexity</h6>
+                    <p>{{ analysis.complexity }}</p>
+                    
+                    {% if analysis.potential_issues %}
+                    <h6>Potential Issues</h6>
+                    <ul>
+                        {% for issue in analysis.potential_issues %}
+                        <li>{{ issue }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    
+                    {% if analysis.suggestions %}
+                    <h6>Suggestions</h6>
+                    <ul>
+                        {% for suggestion in analysis.suggestions %}
+                        <li>{{ suggestion }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Conversation</h5>
+            </div>
+            <div class="card-body">
+                <div id="conversation-container">
+                    {% for message in conversation %}
+                    <div class="message {% if message.sender == 'user' %}user-message{% else %}system-message{% endif %}">
+                        <strong>{{ message.sender|title }}:</strong>
+                        <p>{{ message.content }}</p>
+                        <small class="text-muted">{{ message.timestamp }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <form id="message-form" class="mt-3">
+                    <div class="input-group">
+                        <input type="text" id="message-input" class="form-control" placeholder="Ask a question about your code...">
+                        <button class="btn btn-primary" type="submit">Send</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('message-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const messageInput = document.getElementById('message-input');
+        const message = messageInput.value.trim();
+        
+        if (message) {
+            // Send message to server
+            fetch('/api/conversation/{{ conversation_id }}/message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: message }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Add messages to conversation
+                const conversationContainer = document.getElementById('conversation-container');
+                
+                // Add user message
+                const userMessageDiv = document.createElement('div');
+                userMessageDiv.className = 'message user-message';
+                userMessageDiv.innerHTML = `
+                    <strong>User:</strong>
+                    <p>${message}</p>
+                    <small class="text-muted">${new Date().toLocaleString()}</small>
+                `;
+                conversationContainer.appendChild(userMessageDiv);
+                
+                // Add system response
+                const systemMessageDiv = document.createElement('div');
+                systemMessageDiv.className = 'message system-message';
+                systemMessageDiv.innerHTML = `
+                    <strong>System:</strong>
+                    <p>${data.response}</p>
+                    <small class="text-muted">${new Date().toLocaleString()}</small>
+                `;
+                conversationContainer.appendChild(systemMessageDiv);
+                
+                // Clear input
+                messageInput.value = '';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    });
+</script>
+{% endblock %}

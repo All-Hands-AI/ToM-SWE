@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}ToM-SWE: Conversations{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>Code Conversations</h2>
+        <p class="lead">View your past code analysis conversations.</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        {% if conversations %}
+        <div class="list-group">
+            {% for conversation in conversations %}
+            <a href="/conversation/{{ conversation.id }}" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1">{{ conversation.title }}</h5>
+                    <small>{{ conversation.timestamp }}</small>
+                </div>
+                <p class="mb-1">{{ conversation.summary }}</p>
+                <small>{{ conversation.message_count }} messages</small>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <p>You don't have any code conversations yet.</p>
+            <a href="/analyze" class="btn btn-primary">Start a New Conversation</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if conversations %}
+<div class="row mt-4">
+    <div class="col-md-12 text-center">
+        <a href="/analyze" class="btn btn-primary">Start a New Conversation</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
