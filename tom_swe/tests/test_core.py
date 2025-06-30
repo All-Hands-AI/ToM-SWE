@@ -13,7 +13,11 @@ class TestCore(unittest.TestCase):
         self.assertEqual(result["length"], len(code))
         self.assertEqual(result["lines"], 2)
     
-    # Missing test for empty code snippet
+    def test_process_code_with_empty_string(self):
+        """Test processing code with an empty string."""
+        result = process_code("")
+        self.assertIn("error", result)
+        self.assertEqual(result["error"], "Code snippet cannot be empty")
     
 if __name__ == "__main__":
     unittest.main()
