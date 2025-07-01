@@ -122,7 +122,7 @@ class CodeAnalyzer:
         }
         
         # Add complexity score
-        metrics["complexity"] = calculate_complexity_score(metrics)
+        metrics["complexity"] = calculate_complexity_score(metrics)  # type: ignore
         
         return metrics
 

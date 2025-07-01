@@ -26,7 +26,8 @@ def load_json(file_path: Union[str, Path]) -> Dict[str, Any]:
     
     try:
         with open(file_path, "r") as f:
-            return json.load(f)
+            data: Dict[str, Any] = json.load(f)
+            return data
     except json.JSONDecodeError:
         logger.error(f"Error decoding JSON from {file_path}")
         return {}

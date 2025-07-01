@@ -66,7 +66,7 @@ class CodeExplainer:
         response = self.llm_client.generate(prompt)
         
         try:
-            suggestions = json.loads(response)
+            suggestions: Dict[str, List[Dict[str, Any]]] = json.loads(response)
             return suggestions.get("suggestions", [])
         except json.JSONDecodeError:
             logger.warning("Failed to parse improvement suggestions as JSON")

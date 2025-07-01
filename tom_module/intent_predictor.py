@@ -36,7 +36,7 @@ class IntentPredictor:
         response = self.llm_client.generate(prompt)
         
         try:
-            intent_analysis = json.loads(response)
+            intent_analysis: Dict[str, Any] = json.loads(response)
             logger.info("Intent prediction successful")
             return intent_analysis
         except json.JSONDecodeError:
@@ -63,7 +63,7 @@ class IntentPredictor:
         response = self.llm_client.generate(prompt)
         
         try:
-            changes = json.loads(response)
+            changes: Dict[str, Any] = json.loads(response)
             logger.info("Change prediction successful")
             return changes
         except json.JSONDecodeError:

@@ -76,7 +76,7 @@ def track_user_behavior(actions: List[Dict[str, Any]]) -> Dict[str, Any]:
         }
     
     # Count action types
-    action_types = {}
+    action_types: Dict[str, int] = {}
     for action in actions:
         action_type = action.get("type", "unknown")
         action_types[action_type] = action_types.get(action_type, 0) + 1

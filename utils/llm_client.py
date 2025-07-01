@@ -69,7 +69,8 @@ class LLMClient:
         response = self.generate(prompt)
         
         try:
-            return json.loads(response)
+            result: Dict[str, Any] = json.loads(response)
+            return result
         except json.JSONDecodeError:
             logger.warning("Failed to parse analysis response as JSON")
             return {"error": "Failed to parse response", "raw_response": response}
@@ -94,7 +95,8 @@ class LLMClient:
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
             )
-            return response.choices[0].message.content.strip()
+            content = response.choices[0].message.content
+            return content.strip() if content is not None else ""
         except Exception as e:
             logger.error(f"Error generating text with OpenAI: {e}")
             return f"Error: {str(e)}"
