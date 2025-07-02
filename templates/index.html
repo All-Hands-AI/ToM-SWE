@@ -1,71 +1,54 @@
 {% extends "base.html" %}
 
-{% block title %}ToM-SWE - Home{% endblock %}
+{% block title %}Trajectory Viewer - Home{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <div class="jumbotron">
-            <h1 class="display-4">Theory of Mind for Software Engineering</h1>
-            <p class="lead">Analyze and visualize code trajectories using Theory of Mind principles.</p>
-            <hr class="my-4">
-            <p>Select a user to view their code trajectory analysis.</p>
-        </div>
-    </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-md-6">
+<div class="row justify-content-center">
+    <div class="col-md-8">
         <div class="card">
             <div class="card-header">
-                <h5>Available Users</h5>
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-house"></i>
+                    Welcome to Trajectory Viewer
+                </h3>
             </div>
             <div class="card-body">
-                {% if users %}
-                <ul class="list-group">
-                    {% for user in users %}
-                    <li class="list-group-item">
-                        <a href="/user/{{ user }}">User {{ user }}</a>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <p>No user data available.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+                <p class="lead">View and explore trajectory data for different users.</p>
 
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Upload New Data</h5>
-            </div>
-            <div class="card-body">
-                <form action="/upload" method="post" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="user_id" class="form-label">User ID</label>
-                        <input type="text" class="form-control" id="user_id" name="user_id" required>
+                <div class="mb-4">
+                    <label for="userSelect" class="form-label">Select a user to view their trajectory data:</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="userInput" placeholder="Enter user ID">
+                        <button class="btn btn-primary" type="button" onclick="viewUser()">
+                            <i class="bi bi-search"></i>
+                            View Trajectory
+                        </button>
                     </div>
-                    <div class="mb-3">
-                        <label for="data_file" class="form-label">Data File (JSON)</label>
-                        <input type="file" class="form-control" id="data_file" name="data_file" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Upload</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+                </div>
 
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h5>Recent Activity</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="activityChart" height="100"></canvas>
+                <div class="mb-4">
+                    <h5>Available Users</h5>
+                    <div id="usersList" class="list-group">
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle"></i> Features:</h6>
+                    <ul class="mb-0">
+                        <li>View all conversations for a user, sorted by time</li>
+                        <li>Navigate between conversations with keyboard shortcuts</li>
+                        <li>Filter to show only user messages</li>
+                        <li>View conversation statistics and metadata</li>
+                        <li>Expandable/collapsible event content</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -74,30 +57,55 @@
 
 {% block scripts %}
 <script>
-    // Sample data for the activity chart
-    const activityData = {
-        labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
-        datasets: [{
-            label: 'User Activity',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-            borderColor: 'rgba(75, 192, 192, 1)',
-            borderWidth: 1,
-            data: [65, 59, 80, 81, 56, 55, 40]
-        }]
-    };
+function viewUser() {
+    const userInput = document.getElementById('userInput');
+    const userId = userInput.value.trim();
+    if (userId) {
+        window.location.href = `/user/${encodeURIComponent(userId)}`;
+    } else {
+        alert('Please enter a user ID');
+    }
+}
 
-    // Create the activity chart
-    const activityCtx = document.getElementById('activityChart').getContext('2d');
-    new Chart(activityCtx, {
-        type: 'bar',
-        data: activityData,
-        options: {
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
+// Allow enter key to submit
+document.getElementById('userInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        viewUser();
+    }
+});
+
+// Load available users
+async function loadUsers() {
+    try {
+        const response = await fetch('/api/users');
+        const data = await response.json();
+
+        const usersList = document.getElementById('usersList');
+
+        if (data.users && data.users.length > 0) {
+            usersList.innerHTML = '';
+            data.users.forEach(userId => {
+                const link = document.createElement('a');
+                link.href = `/user/${encodeURIComponent(userId)}`;
+                link.className = 'list-group-item list-group-item-action';
+                link.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-person"></i> ${userId}</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </div>
+                `;
+                usersList.appendChild(link);
+            });
+        } else {
+            usersList.innerHTML = '<div class="list-group-item text-muted">No users found in data directory</div>';
         }
-    });
+    } catch (error) {
+        console.error('Error loading users:', error);
+        document.getElementById('usersList').innerHTML = '<div class="list-group-item text-danger">Error loading users</div>';
+    }
+}
+
+// Load users when page loads
+document.addEventListener('DOMContentLoaded', loadUsers);
 </script>
 {% endblock %}

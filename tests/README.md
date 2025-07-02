@@ -1,41 +1,99 @@
-# ToM-SWE Tests
+# Tom Module Tests
 
-This directory contains tests for the ToM-SWE package.
+This directory contains comprehensive tests for the tom_module's 3-tier user analysis system.
+
+## Test Coverage
+
+### **TestDataLoading**
+- Tests session discovery (`get_user_session_ids`)
+- Handles missing users, empty files, and valid users
+
+### **TestStep1AnalyzeUserMentalState**
+- Tests **Step 1** of `process_and_save_user_session`
+- Covers LLM analysis and error handling
+- Uses mocked LLM responses for consistency
+
+### **TestStep2SaveSessionAnalysesToJsonl**
+- Tests **Step 2** of `process_and_save_user_session`
+- Validates JSONL file format and content
+- Tests directory creation and file writing
+
+### **TestStep3SummarizeSessionFromAnalyses**
+- Tests **Step 3** of `process_and_save_user_session`
+- Validates session summary aggregation logic
+- Tests intent counting and emotion progression
+
+### **TestStep4UpdateOverallUserAnalysis**
+- Tests **Step 4** of `process_and_save_user_session`
+- Validates user profile creation and updates
+- Tests new users vs existing users
+
+### **TestIntegrationProcessAndSaveUserSession**
+- Tests the complete `process_and_save_user_session` pipeline
+- End-to-end validation of all 3 tiers
+- Tests `process_all_user_sessions` for multiple sessions
+
+### **TestUtilityFunctions**
+- Tests helper functions and directory creation
+- Profile update logic and data structures
 
 ## Running Tests
 
-To run all tests:
-
+### **Run All Tests**
 ```bash
-pytest
+# From project root
+python tests/run_tests.py
+
+# Or with pytest directly
+pytest tests/ -v
 ```
 
-To run a specific test file:
-
+### **Run Specific Test File**
 ```bash
-pytest tests/test_core.py
+# Using test runner
+python tests/run_tests.py test_process_and_save_steps.py
+
+# Or with pytest
+pytest tests/test_process_and_save_steps.py -v
 ```
 
-To run tests with coverage:
-
+### **Run Specific Test Class**
 ```bash
-pytest --cov=tom_swe
+pytest tests/test_process_and_save_steps.py::TestIntegrationProcessAndSaveUserSession -v
 ```
 
-## Test Structure
+### **Run Specific Test Method**
+```bash
+pytest tests/test_process_and_save_steps.py::TestIntegrationProcessAndSaveUserSession::test_process_and_save_user_session_success -v
+```
 
-- `test_core.py`: Tests for the core functionality
-- `test_tom_module.py`: Tests for the Theory of Mind module
-- `test_database.py`: Tests for the database functionality
-- `test_utils.py`: Tests for utility functions
-- `test_visualization.py`: Tests for visualization tools
+## Test Data
 
-## Adding Tests
+Tests use temporary directories and mock data:
+- **`conftest.py`**: Contains fixtures for test data and mock objects
+- **Mock LLM responses**: Prevents real API calls during testing
+- **Temporary directories**: Isolated file operations
+- **Sample user data**: Realistic session structures
 
-When adding new functionality, please add corresponding tests. Follow these guidelines:
+## Key Testing Features
 
-1. Create test functions with descriptive names
-2. Use appropriate assertions to verify functionality
-3. Include tests for edge cases and error conditions
-4. Use fixtures for common setup and teardown
-5. Keep tests independent of each other
+- ✅ **No external dependencies**: Tests use mocked LLM calls
+- ✅ **Isolated file operations**: Each test uses temp directories
+- ✅ **Comprehensive step coverage**: Tests each step in the pipeline
+- ✅ **Error handling**: Tests missing files, empty data, etc.
+- ✅ **Data validation**: Verifies JSONL format, JSON structure
+- ✅ **Integration testing**: End-to-end pipeline validation
+
+## Expected Output Structure
+
+When tests run successfully, they validate the creation of:
+
+```
+temp_test_dir/user_model/
+├── user_model_detailed/           # Tier 1: Per-message analysis
+│   └── test_user_123/
+│       ├── session_001.jsonl      # JSONL with message analyses
+│       └── session_002.jsonl
+└── user_model_overall/            # Tier 2 & 3: Session summaries + user profiles
+    └── test_user_123.json         # Complete user analysis
+```

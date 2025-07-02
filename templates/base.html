@@ -3,63 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}ToM-SWE{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>{% block title %}Trajectory Viewer{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        body {
-            padding-top: 20px;
-            padding-bottom: 20px;
+        .event-card {
+            margin-bottom: 1rem;
         }
-        .navbar {
-            margin-bottom: 20px;
+        .event-content {
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
         }
-        .content {
-            margin-top: 20px;
+        .conversation-stats {
+            background-color: #f8f9fa;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
         }
-        .footer {
-            margin-top: 40px;
-            padding: 20px 0;
-            border-top: 1px solid #e5e5e5;
-            color: #777;
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .source-badge {
+            font-size: 0.75em;
+        }
+        .content-expandable {
+            cursor: pointer;
+        }
+        .content-collapsed {
+            max-height: 150px;
+            overflow: hidden;
+            position: relative;
+        }
+        .content-collapsed::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(transparent, white);
+        }
+        .original-event-content {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .original-event-content pre {
+            margin: 0;
+            padding: 0.75rem;
+            font-size: 0.8em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .original-event-content code {
+            color: #495057;
         }
     </style>
-    {% block head %}{% endblock %}
 </head>
 <body>
-    <div class="container">
-        <nav class="navbar navbar-expand-lg navbar-light bg-light">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="/">ToM-SWE</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav">
-                        <li class="nav-item">
-                            <a class="nav-link" href="/">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/users">Users</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/about">About</a>
-                        </li>
-                    </ul>
-                </div>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-diagram-3"></i>
+                Trajectory Viewer
+            </a>
+            {% if user_id %}
+            <div class="navbar-nav">
+                <a class="nav-link" href="{{ url_for('user_conversations', user_id=user_id) }}">
+                    <i class="bi bi-person"></i>
+                    {{ user_id }}
+                </a>
             </div>
-        </nav>
-
-        <div class="content">
-            {% block content %}{% endblock %}
+            {% endif %}
         </div>
+    </nav>
 
-        <footer class="footer">
-            <p>&copy; 2023 ToM-SWE Project</p>
-        </footer>
+    <div class="container mt-4">
+        {% block content %}{% endblock %}
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Toggle content expansion
+        document.addEventListener('DOMContentLoaded', function() {
+            const expandableContents = document.querySelectorAll('.content-expandable');
+            expandableContents.forEach(content => {
+                content.addEventListener('click', function() {
+                    this.classList.toggle('content-collapsed');
+                });
+            });
+        });
+
+        // Auto-expand content that's not too long
+        document.addEventListener('DOMContentLoaded', function() {
+            const contents = document.querySelectorAll('.event-content');
+            contents.forEach(content => {
+                if (content.scrollHeight <= 200) {
+                    content.classList.remove('content-collapsed');
+                }
+            });
+        });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
