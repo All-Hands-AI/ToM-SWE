@@ -116,4 +116,4 @@ data/
 # Logs
 *.log
 
-EXPERIMENT_LOG.md
+./EXPERIMENT_LOG.md
