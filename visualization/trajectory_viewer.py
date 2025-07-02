@@ -3,7 +3,7 @@
 import os
 import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 import datetime
 
@@ -298,7 +298,7 @@ class TrajectoryViewer:
         """Set up Flask routes."""
         
         @self.app.route('/')
-        def index():
+        def index() -> str:
             """Render the index page."""
             # Get list of available users
             user_files = list(self.data_dir.glob("analysis_*.json"))
@@ -306,7 +306,7 @@ class TrajectoryViewer:
             return render_template('index.html', users=users)
         
         @self.app.route('/user/<user_id>')
-        def user_trajectory(user_id):
+        def user_trajectory(user_id: str) -> str:
             """Render trajectory for a specific user."""
             analysis_file = self.data_dir / f"analysis_{user_id}.json"
             
@@ -329,14 +329,14 @@ class TrajectoryViewer:
             )
         
         @self.app.route('/api/users')
-        def api_users():
+        def api_users() -> Any:
             """API endpoint for user list."""
             user_files = list(self.data_dir.glob("analysis_*.json"))
             users = [f.stem.replace("analysis_", "") for f in user_files]
             return jsonify(users)
         
         @self.app.route('/api/user/<user_id>')
-        def api_user_data(user_id):
+        def api_user_data(user_id: str) -> Any:
             """API endpoint for user data."""
             analysis_file = self.data_dir / f"analysis_{user_id}.json"
             

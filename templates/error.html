@@ -1,17 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}ToM-SWE - Error{% endblock %}
+{% block title %}Error - Trajectory Viewer{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <div class="alert alert-danger" role="alert">
-            <h4 class="alert-heading">Error</h4>
-            <p>{{ message }}</p>
-            <hr>
-            <p class="mb-0">Please go back and try again.</p>
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="alert alert-danger">
+            <h4 class="alert-heading">
+                <i class="bi bi-exclamation-triangle"></i>
+                Error
+            </h4>
+            <p class="mb-0">{{ error }}</p>
         </div>
-        <a href="/" class="btn btn-primary">Return to Home</a>
+
+        <div class="text-center">
+            <a href="{{ url_for('index') }}" class="btn btn-primary">
+                <i class="bi bi-house"></i>
+                Go Home
+            </a>
+        </div>
     </div>
 </div>
 {% endblock %}

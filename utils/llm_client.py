@@ -5,7 +5,7 @@ import json
 import logging
 from typing import Dict, Any, Optional, List
 
-import openai
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +27,14 @@ class LLMClient:
         
         # Set up API keys
         if self.provider == "openai":
-            openai.api_key = self.config.get("api_key") or os.environ.get("OPENAI_API_KEY")
-            if not openai.api_key:
+            api_key = self.config.get("api_key") or os.environ.get("OPENAI_API_KEY")
+            if not api_key:
                 logger.warning("OpenAI API key not found. Set OPENAI_API_KEY environment variable.")
+                self.client = None
+            else:
+                self.client = OpenAI(api_key=api_key)
+        else:
+            self.client = None
         
         logger.info(f"LLMClient initialized with provider: {self.provider}, model: {self.model}")
 
@@ -64,7 +69,8 @@ class LLMClient:
         response = self.generate(prompt)
         
         try:
-            return json.loads(response)
+            result: Dict[str, Any] = json.loads(response)
+            return result
         except json.JSONDecodeError:
             logger.warning("Failed to parse analysis response as JSON")
             return {"error": "Failed to parse response", "raw_response": response}
@@ -78,14 +84,19 @@ class LLMClient:
         Returns:
             Generated text.
         """
+        if not self.client:
+            logger.warning("OpenAI client not initialized, falling back to mock response")
+            return self._generate_mock(prompt)
+            
         try:
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
             )
-            return response.choices[0].message.content.strip()
+            content = response.choices[0].message.content
+            return content.strip() if content is not None else ""
         except Exception as e:
             logger.error(f"Error generating text with OpenAI: {e}")
             return f"Error: {str(e)}"

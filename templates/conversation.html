@@ -1,151 +1,267 @@
 {% extends "base.html" %}
 
-{% block title %}ToM-SWE - Conversation{% endblock %}
+{% block title %}{{ title }} - Conversation {{ conv_index + 1 }} - {{ user_id }}{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h2>Conversation with User {{ user_id }}</h2>
-        <p>Conversation ID: {{ conversation_id }}</p>
+<!-- Header with navigation -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>
+            <i class="bi bi-chat"></i>
+            Conversation {{ conv_index + 1 }}/{{ navigation.total }}
+            {% if user_only %}
+            <span class="badge bg-warning">USER ONLY</span>
+            {% endif %}
+            {% if gui_only %}
+            <span class="badge bg-info">GUI FILTERED</span>
+            {% endif %}
+        </h2>
+        <div class="d-flex flex-column">
+            <h5 class="text-primary mb-1">{{ title }}</h5>
+            {% if repository and repository != 'Unknown' %}
+            <div class="mb-1">
+                <i class="bi bi-github"></i>
+                <span class="badge bg-secondary">{{ repository }}</span>
+            </div>
+            {% endif %}
+            <small class="text-muted">
+                <code>{{ conv_id }}</code>
+            </small>
+        </div>
+    </div>
+
+    <!-- Navigation controls -->
+    <div class="btn-group" role="group">
+        <a href="{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=page, per_page=per_page) }}"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-list"></i> All Conversations
+        </a>
+        {% if navigation.has_prev %}
+        <a href="{{ url_for('view_conversation', user_id=user_id, conv_index=navigation.prev_index, user_only=user_only, gui_only=gui_only, sort_by=sort_by, page=page, per_page=per_page) }}"
+           class="btn btn-outline-primary">
+            <i class="bi bi-chevron-left"></i> Previous
+        </a>
+        {% endif %}
+        {% if navigation.has_next %}
+        <a href="{{ url_for('view_conversation', user_id=user_id, conv_index=navigation.next_index, user_only=user_only, gui_only=gui_only, sort_by=sort_by, page=page, per_page=per_page) }}"
+           class="btn btn-outline-primary">
+            Next <i class="bi bi-chevron-right"></i>
+        </a>
+        {% endif %}
     </div>
 </div>
 
-<div class="row mt-4">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5>Conversation History</h5>
-            </div>
-            <div class="card-body">
-                <div class="conversation-container">
-                    {% for message in messages %}
-                    <div class="message {% if message.sender == 'user' %}user-message{% else %}system-message{% endif %}">
-                        <div class="message-header">
-                            <strong>{{ message.sender|title }}</strong>
-                            <span class="text-muted">{{ message.timestamp }}</span>
-                        </div>
-                        <div class="message-content">
-                            {{ message.content }}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-
-        <div class="card mt-4">
-            <div class="card-header">
-                <h5>New Message</h5>
-            </div>
-            <div class="card-body">
-                <form action="/conversation/{{ conversation_id }}/send" method="post">
-                    <div class="mb-3">
-                        <textarea class="form-control" id="message" name="message" rows="3" required></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Send</button>
-                </form>
-            </div>
-        </div>
+<!-- Metadata card -->
+{% if metadata %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-info-circle"></i>
+            Conversation Metadata
+            {% if is_gui == True %}
+            <span class="badge bg-warning ms-2"><i class="bi bi-window"></i> GUI</span>
+            {% elif is_gui == False %}
+            <span class="badge bg-secondary ms-2"><i class="bi bi-code"></i> API</span>
+            {% endif %}
+        </h5>
     </div>
-
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5>Conversation Analysis</h5>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                {% if cost > 0 %}
+                <p><strong>Cost:</strong> <span class="text-success">${{ "%.3f"|format(cost) }}</span></p>
+                {% endif %}
+                {% if tokens.total > 0 %}
+                <p><strong>Tokens:</strong>
+                   <span class="text-info">{{ (tokens.total / 1000) | round(1) }}k total</span>
+                   <small class="text-muted">({{ tokens.prompt }} prompt, {{ tokens.completion }} completion)</small>
+                </p>
+                {% endif %}
             </div>
-            <div class="card-body">
-                <h6>Intent Recognition</h6>
-                <div class="progress mb-3">
-                    <div class="progress-bar" role="progressbar" style="width: {{ intent_confidence }}%;" aria-valuenow="{{ intent_confidence }}" aria-valuemin="0" aria-valuemax="100">{{ intent_confidence }}%</div>
-                </div>
-                <p><strong>Detected Intent:</strong> {{ detected_intent }}</p>
-                
-                <h6>Sentiment Analysis</h6>
-                <div class="progress mb-3">
-                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ sentiment_positive }}%;" aria-valuenow="{{ sentiment_positive }}" aria-valuemin="0" aria-valuemax="100">{{ sentiment_positive }}%</div>
-                </div>
-                <p><strong>Overall Sentiment:</strong> {{ overall_sentiment }}</p>
-                
-                <h6>Topic Distribution</h6>
-                <canvas id="topicChart"></canvas>
+            <div class="col-md-6">
+                {% if metadata.created_at %}
+                <p><strong>Created:</strong> {{ metadata.created_at | truncate(19) }}</p>
+                {% endif %}
+                {% if metadata.selected_branch %}
+                <p><strong>Branch:</strong> <code>{{ metadata.selected_branch }}</code></p>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
+{% endif %}
+
+<!-- Filter controls -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="btn-group" role="group">
+        <a href="{{ url_for('view_conversation', user_id=user_id, conv_index=conv_index, gui_only=gui_only, sort_by=sort_by, page=page, per_page=per_page) }}"
+           class="btn {% if not user_only %}btn-primary{% else %}btn-outline-primary{% endif %}">
+            <i class="bi bi-eye"></i> All Events ({{ original_count }})
+        </a>
+        <a href="{{ url_for('view_conversation', user_id=user_id, conv_index=conv_index, user_only='true', gui_only=gui_only, sort_by=sort_by, page=page, per_page=per_page) }}"
+           class="btn {% if user_only %}btn-warning{% else %}btn-outline-warning{% endif %}">
+            <i class="bi bi-person"></i> User Only ({{ filtered_count }})
+        </a>
+    </div>
+
+    <div class="text-muted">
+        Showing {{ filtered_count }} events
+    </div>
+</div>
+
+<!-- Conversation statistics -->
+<div class="conversation-stats">
+    <h5><i class="bi bi-graph-up"></i> Statistics</h5>
+    <div class="row">
+        <div class="col-md-3">
+            <strong>Total Events:</strong> {{ stats.total_events }}
+        </div>
+        <div class="col-md-3">
+            <strong>Real User Messages:</strong> <span class="badge bg-primary">{{ stats.real_user_messages }}</span>
+        </div>
+        <div class="col-md-3">
+            <strong>Agent Messages:</strong> <span class="badge bg-success">{{ stats.agent_messages }}</span>
+        </div>
+        <div class="col-md-3">
+            <strong>Duration:</strong> {{ stats.duration }}
+        </div>
+    </div>
+    <div class="row mt-2">
+        <div class="col-md-3">
+            <strong>Start:</strong> {{ stats.formatted_start }}
+        </div>
+        <div class="col-md-3">
+            <strong>End:</strong> {{ stats.formatted_end }}
+        </div>
+        <div class="col-md-3">
+            <strong>Environment:</strong> <span class="badge bg-info">{{ stats.environment_messages }}</span>
+        </div>
+        <div class="col-md-3">
+            <strong>Event Range:</strong> {{ stats.first_event_id }} → {{ stats.last_event_id }}
+        </div>
+    </div>
+</div>
+
+<!-- Events -->
+{% if events %}
+<div class="events-container">
+    {% for event in events %}
+    <div class="card event-card border-{{ event.color_class }}">
+        <div class="card-header bg-{{ event.color_class }} text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="badge bg-light text-dark source-badge">{{ event.source }}</span>
+                    <strong>{{ event.action }}</strong>
+                </div>
+                <small>ID: {{ event.id }}</small>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="event-content content-expandable {% if event.content|length > 200 %}content-collapsed{% endif %}">{{ event.content }}</div>
+            {% if event.content != event.truncated_content %}
+            <div class="mt-2">
+                <small class="text-muted">Click to expand/collapse content</small>
+            </div>
+            {% endif %}
+
+
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-warning">
+    <h5><i class="bi bi-exclamation-triangle"></i> No Events Found</h5>
+    <p class="mb-0">
+        {% if user_only %}
+        No user messages found in this conversation.
+        {% else %}
+        No events found in this conversation.
+        {% endif %}
+    </p>
+</div>
+{% endif %}
+
+<!-- Bottom navigation -->
+{% if events %}
+<div class="d-flex justify-content-center mt-4">
+    <div class="btn-group" role="group">
+        {% if navigation.has_prev %}
+        <a href="{{ url_for('view_conversation', user_id=user_id, conv_index=navigation.prev_index, user_only=user_only, gui_only=gui_only, sort_by=sort_by, page=page, per_page=per_page) }}"
+           class="btn btn-outline-primary">
+            <i class="bi bi-chevron-left"></i> Previous Conversation
+        </a>
+        {% endif %}
+        <a href="{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=page, per_page=per_page) }}"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-list"></i> Back to List
+        </a>
+        {% if navigation.has_next %}
+        <a href="{{ url_for('view_conversation', user_id=user_id, conv_index=navigation.next_index, user_only=user_only, gui_only=gui_only, sort_by=sort_by, page=page, per_page=per_page) }}"
+           class="btn btn-outline-primary">
+            Next Conversation <i class="bi bi-chevron-right"></i>
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Topic distribution chart
-    const topicData = {
-        labels: {{ topic_labels|safe }},
-        datasets: [{
-            label: 'Topic Distribution',
-            data: {{ topic_values|safe }},
-            backgroundColor: [
-                'rgba(255, 99, 132, 0.2)',
-                'rgba(54, 162, 235, 0.2)',
-                'rgba(255, 206, 86, 0.2)',
-                'rgba(75, 192, 192, 0.2)',
-                'rgba(153, 102, 255, 0.2)'
-            ],
-            borderColor: [
-                'rgba(255, 99, 132, 1)',
-                'rgba(54, 162, 235, 1)',
-                'rgba(255, 206, 86, 1)',
-                'rgba(75, 192, 192, 1)',
-                'rgba(153, 102, 255, 1)'
-            ],
-            borderWidth: 1
-        }]
-    };
+// Keyboard navigation
+document.addEventListener('keydown', function(e) {
+    // Prevent default for navigation keys
+    if (['ArrowLeft', 'ArrowRight', 'u', 'l'].includes(e.key)) {
+        e.preventDefault();
+    }
 
-    // Create the topic chart
-    const topicCtx = document.getElementById('topicChart').getContext('2d');
-    new Chart(topicCtx, {
-        type: 'doughnut',
-        data: topicData,
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                }
-            }
+    const params = new URLSearchParams();
+    {% if user_only %}params.set('user_only', 'true');{% endif %}
+    {% if gui_only %}params.set('gui_only', 'true');{% endif %}
+    {% if sort_by != 'time' %}params.set('sort_by', '{{ sort_by }}');{% endif %}
+    const query = params.toString() ? '?' + params.toString() : '';
+
+    if (e.key === 'ArrowLeft' && {% if navigation.has_prev %}true{% else %}false{% endif %}) {
+        window.location.href = '{{ url_for("view_conversation", user_id=user_id, conv_index=navigation.prev_index) }}' + query;
+    }
+
+    if (e.key === 'ArrowRight' && {% if navigation.has_next %}true{% else %}false{% endif %}) {
+        window.location.href = '{{ url_for("view_conversation", user_id=user_id, conv_index=navigation.next_index) }}' + query;
+    }
+
+    if (e.key === 'u') {
+        const newParams = new URLSearchParams(params);
+        if (newParams.has('user_only')) {
+            newParams.delete('user_only');
+        } else {
+            newParams.set('user_only', 'true');
+        }
+        const newQuery = newParams.toString() ? '?' + newParams.toString() : '';
+        window.location.href = '{{ url_for("view_conversation", user_id=user_id, conv_index=conv_index) }}' + newQuery;
+    }
+
+
+
+    if (e.key === 'l') {
+        e.preventDefault();
+        window.location.href = '{{ url_for("user_conversations", user_id=user_id, gui_only=gui_only, sort_by=sort_by) }}';
+    }
+});
+
+// Scroll to top when navigating
+window.addEventListener('load', function() {
+    window.scrollTo(0, 0);
+});
+
+// Auto-expand short content
+document.addEventListener('DOMContentLoaded', function() {
+    const contents = document.querySelectorAll('.event-content');
+    contents.forEach(content => {
+        if (content.scrollHeight <= 200) {
+            content.classList.remove('content-collapsed');
         }
     });
+});
 </script>
-{% endblock %}
-
-{% block head %}
-<style>
-    .conversation-container {
-        max-height: 400px;
-        overflow-y: auto;
-    }
-    
-    .message {
-        margin-bottom: 15px;
-        padding: 10px;
-        border-radius: 5px;
-    }
-    
-    .user-message {
-        background-color: #f8f9fa;
-        border-left: 4px solid #007bff;
-    }
-    
-    .system-message {
-        background-color: #e9ecef;
-        border-left: 4px solid #6c757d;
-    }
-    
-    .message-header {
-        margin-bottom: 5px;
-    }
-    
-    .message-content {
-        white-space: pre-wrap;
-    }
-</style>
 {% endblock %}

@@ -1,1 +1,1 @@
-"""Test package for ToM-SWE."""
+# Tests package for tom_module

@@ -115,3 +115,5 @@ data/
 
 # Logs
 *.log
+
+./EXPERIMENT_LOG.md

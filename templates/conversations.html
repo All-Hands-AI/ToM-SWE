@@ -1,96 +1,385 @@
 {% extends "base.html" %}
 
-{% block title %}ToM-SWE - Conversations{% endblock %}
+{% block title %}Conversations - {{ user_id }}{% endblock %}
 
 {% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>
+        <i class="bi bi-chat-dots"></i>
+        Conversations for {{ user_id }}
+    </h2>
+    <div class="d-flex align-items-center gap-2">
+        {% if gui_only %}
+        <span class="badge bg-warning">GUI ONLY</span>
+        {% endif %}
+        {% if sort_by == 'user_messages' %}
+        <span class="badge bg-info">SORTED BY USER MESSAGES</span>
+        {% endif %}
+        <span class="badge bg-primary fs-6">
+            {% if pagination %}
+            {{ pagination.start_idx }}-{{ pagination.end_idx }} of {{ pagination.total }} conversations
+            {% if total_original != pagination.total %}
+            ({{ total_original }} total)
+            {% endif %}
+            {% else %}
+            {{ total_conversations }} conversations
+            {% if total_original != total_conversations %}
+            ({{ total_original }} total)
+            {% endif %}
+            {% endif %}
+        </span>
+    </div>
+</div>
+
+<!-- Filter and Sort Controls -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <div class="btn-group" role="group" aria-label="Filter options">
+                    <a href="{{ url_for('user_conversations', user_id=user_id, sort_by=sort_by, page=1) }}"
+                       class="btn {% if not gui_only %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        <i class="bi bi-collection"></i> All Conversations
+                    </a>
+                    <a href="{{ url_for('user_conversations', user_id=user_id, gui_only='true', sort_by=sort_by, page=1) }}"
+                       class="btn {% if gui_only %}btn-warning{% else %}btn-outline-warning{% endif %}">
+                        <i class="bi bi-window"></i> GUI Only
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="btn-group float-end" role="group" aria-label="Sort options">
+                    <a href="{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by='time', page=1) }}"
+                       class="btn {% if sort_by == 'time' %}btn-info{% else %}btn-outline-info{% endif %}">
+                        <i class="bi bi-clock"></i> Sort by Time
+                    </a>
+                    <a href="{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by='user_messages', page=1) }}"
+                       class="btn {% if sort_by == 'user_messages' %}btn-success{% else %}btn-outline-success{% endif %}">
+                        <i class="bi bi-person-check"></i> Sort by User Messages
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination Controls (Top) -->
+{% if pagination and pagination.total_pages > 1 %}
+<nav aria-label="Conversations pagination" class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+            <select class="form-select form-select-sm" style="width: auto;" onchange="changePerPage(this.value)">
+                <option value="25" {% if pagination.per_page == 25 %}selected{% endif %}>25 per page</option>
+                <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50 per page</option>
+                <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100 per page</option>
+                <option value="200" {% if pagination.per_page == 200 %}selected{% endif %}>200 per page</option>
+            </select>
+        </div>
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                <a class="page-link" href="{% if pagination.has_prev %}{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=pagination.prev_page, per_page=pagination.per_page) }}{% else %}#{% endif %}">
+                    <i class="bi bi-chevron-left"></i> Previous
+                </a>
+            </li>
+
+            {% set start_page = [1, pagination.page - 2] | max %}
+            {% set end_page = [pagination.total_pages, pagination.page + 2] | min %}
+
+            {% if start_page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=1, per_page=pagination.per_page) }}">1</a>
+            </li>
+            {% if start_page > 2 %}
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+            {% endif %}
+            {% endif %}
+
+            {% for page_num in range(start_page, end_page + 1) %}
+            <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=page_num, per_page=pagination.per_page) }}">{{ page_num }}</a>
+            </li>
+            {% endfor %}
+
+            {% if end_page < pagination.total_pages %}
+            {% if end_page < pagination.total_pages - 1 %}
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+            {% endif %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=pagination.total_pages, per_page=pagination.per_page) }}">{{ pagination.total_pages }}</a>
+            </li>
+            {% endif %}
+
+            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                <a class="page-link" href="{% if pagination.has_next %}{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=pagination.next_page, per_page=pagination.per_page) }}{% else %}#{% endif %}">
+                    Next <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+{% endif %}
+
 <div class="row">
     <div class="col-md-12">
-        <h2>Conversations for User {{ user_id }}</h2>
-    </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5>Conversation History</h5>
-            </div>
-            <div class="card-body">
-                {% if conversations %}
-                <div class="list-group">
-                    {% for conversation in conversations %}
-                    <a href="/conversation/{{ conversation.id }}" class="list-group-item list-group-item-action">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h5 class="mb-1">Conversation {{ conversation.id }}</h5>
-                            <small>{{ conversation.timestamp }}</small>
-                        </div>
-                        <p class="mb-1">{{ conversation.summary }}</p>
-                        <small>{{ conversation.message_count }} messages</small>
-                    </a>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Title</th>
+                        <th>Repository</th>
+                        <th>Type</th>
+                        <th>Start Time</th>
+                        <th>Duration</th>
+                        <th>Real User Messages</th>
+                        <th>Cost</th>
+                        <th>Tokens</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for conv in conversations %}
+                    <tr onclick="window.location.href='{{ url_for('view_conversation', user_id=user_id, conv_index=conv.index, gui_only=gui_only, sort_by=sort_by, page=pagination.page if pagination else 1, per_page=pagination.per_page if pagination else 50) }}'"
+                        style="cursor: pointer;" class="conversation-row">
+                        <td><strong>{{ conv.index + 1 }}</strong></td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span class="fw-bold text-truncate" style="max-width: 200px;" title="{{ conv.title }}">
+                                    {{ conv.title or 'Untitled' }}
+                                </span>
+                                <small class="text-muted" title="{{ conv.conv_id }}">
+                                    <code>{{ conv.conv_id[:12] }}...</code>
+                                </small>
+                            </div>
+                        </td>
+                        <td>
+                            {% if conv.repository and conv.repository != 'Unknown' %}
+                            <span class="badge bg-secondary" title="{{ conv.repository }}">
+                                {% if '/' in conv.repository %}
+                                {{ conv.repository.split('/')[-1] }}
+                                {% else %}
+                                {{ conv.repository }}
+                                {% endif %}
+                            </span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if conv.is_gui == True %}
+                            <span class="badge bg-warning"><i class="bi bi-window"></i> GUI</span>
+                            {% elif conv.is_gui == False %}
+                            <span class="badge bg-secondary"><i class="bi bi-code"></i> API</span>
+                            {% else %}
+                            <span class="badge bg-light text-dark"><i class="bi bi-question"></i> Unknown</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ conv.stats.formatted_start }}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ conv.stats.duration }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-primary">{{ conv.stats.real_user_messages }}</span>
+                        </td>
+                        <td>
+                            {% if conv.cost > 0 %}
+                            <small class="text-success">${{ "%.3f"|format(conv.cost) }}</small>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if conv.tokens.total > 0 %}
+                            <small class="text-info" title="Total: {{ conv.tokens.total }}, Prompt: {{ conv.tokens.prompt }}, Completion: {{ conv.tokens.completion }}">
+                                {{ (conv.tokens.total / 1000) | round(1) }}k
+                            </small>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{{ url_for('view_conversation', user_id=user_id, conv_index=conv.index, gui_only=gui_only, sort_by=sort_by, page=pagination.page if pagination else 1, per_page=pagination.per_page if pagination else 50) }}"
+                                   class="btn btn-outline-primary btn-sm" onclick="event.stopPropagation()">
+                                    <i class="bi bi-eye"></i> View
+                                </a>
+                                <a href="{{ url_for('view_conversation', user_id=user_id, conv_index=conv.index, user_only='true', gui_only=gui_only, sort_by=sort_by, page=pagination.page if pagination else 1, per_page=pagination.per_page if pagination else 50) }}"
+                                   class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation()">
+                                    <i class="bi bi-person"></i> User Only
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
                     {% endfor %}
-                </div>
-                {% else %}
-                <p>No conversations found for this user.</p>
-                {% endif %}
-            </div>
+                </tbody>
+            </table>
         </div>
     </div>
+</div>
 
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5>Start New Conversation</h5>
-            </div>
-            <div class="card-body">
-                <form action="/conversation/new" method="post">
-                    <input type="hidden" name="user_id" value="{{ user_id }}">
-                    <div class="mb-3">
-                        <label for="initial_message" class="form-label">Initial Message</label>
-                        <textarea class="form-control" id="initial_message" name="initial_message" rows="3" required></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Start Conversation</button>
-                </form>
-            </div>
-        </div>
+<!-- Pagination Controls (Bottom) -->
+{% if pagination and pagination.total_pages > 1 %}
+<nav aria-label="Conversations pagination" class="mt-4">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{% if pagination.has_prev %}{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=pagination.prev_page, per_page=pagination.per_page) }}{% else %}#{% endif %}">
+                <i class="bi bi-chevron-left"></i> Previous
+            </a>
+        </li>
 
-        <div class="card mt-4">
-            <div class="card-header">
-                <h5>Conversation Statistics</h5>
+        {% set start_page = [1, pagination.page - 2] | max %}
+        {% set end_page = [pagination.total_pages, pagination.page + 2] | min %}
+
+        {% if start_page > 1 %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=1, per_page=pagination.per_page) }}">1</a>
+        </li>
+        {% if start_page > 2 %}
+        <li class="page-item disabled">
+            <span class="page-link">...</span>
+        </li>
+        {% endif %}
+        {% endif %}
+
+        {% for page_num in range(start_page, end_page + 1) %}
+        <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=page_num, per_page=pagination.per_page) }}">{{ page_num }}</a>
+        </li>
+        {% endfor %}
+
+        {% if end_page < pagination.total_pages %}
+        {% if end_page < pagination.total_pages - 1 %}
+        <li class="page-item disabled">
+            <span class="page-link">...</span>
+        </li>
+        {% endif %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=pagination.total_pages, per_page=pagination.per_page) }}">{{ pagination.total_pages }}</a>
+        </li>
+        {% endif %}
+
+        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{% if pagination.has_next %}{{ url_for('user_conversations', user_id=user_id, gui_only=gui_only, sort_by=sort_by, page=pagination.next_page, per_page=pagination.per_page) }}{% else %}#{% endif %}">
+                Next <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+{% if conversations %}
+<div class="alert alert-info mt-4">
+    <h6><i class="bi bi-info-circle"></i> Navigation Tips:</h6>
+    <ul class="mb-0">
+        <li>Click on any row to view the conversation</li>
+        <li>Use "View" to see all events or "User Only" to see just user messages</li>
+        <li><strong>GUI</strong> conversations are from the web interface, <strong>API</strong> from programmatic access</li>
+        <li>Use filters to show only GUI conversations or sort by user message count</li>
+        <li>Change "per page" to load more conversations at once if needed</li>
+    </ul>
+</div>
+{% else %}
+<div class="alert alert-warning">
+    <h5><i class="bi bi-exclamation-triangle"></i> No Conversations Found</h5>
+    <p class="mb-0">
+        {% if gui_only %}
+        No GUI conversations found for user <strong>{{ user_id }}</strong>. Try viewing all conversations.
+        {% else %}
+        No conversation data found for user <strong>{{ user_id }}</strong>.
+        {% endif %}
+    </p>
+</div>
+{% endif %}
+
+<!-- Summary Statistics -->
+{% if conversations %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-graph-up"></i> Summary Statistics {% if pagination %}(Current Page){% endif %}</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="text-center">
+                    <h4 class="text-primary">{{ conversations | sum(attribute='stats.real_user_messages') }}</h4>
+                    <small class="text-muted">Real User Messages {% if pagination %}(Page {{ pagination.page }}){% endif %}</small>
+                </div>
             </div>
-            <div class="card-body">
-                <canvas id="conversationStatsChart"></canvas>
+            <div class="col-md-4">
+                <div class="text-center">
+                    <h4 class="text-success">${{ "%.2f"|format(conversations | sum(attribute='cost')) }}</h4>
+                    <small class="text-muted">Cost {% if pagination %}(Page {{ pagination.page }}){% endif %}</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center">
+                    <h4 class="text-info">{{ ((conversations | sum(attribute='tokens.total')) / 1000) | round(1) }}k</h4>
+                    <small class="text-muted">Tokens {% if pagination %}(Page {{ pagination.page }}){% endif %}</small>
+                </div>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Conversation statistics chart
-    const statsData = {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        datasets: [{
-            label: 'Conversations',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-            borderColor: 'rgba(75, 192, 192, 1)',
-            borderWidth: 1,
-            data: [3, 5, 2, 7, 4, 6]
-        }]
-    };
+// Add hover effects
+document.addEventListener('DOMContentLoaded', function() {
+    const rows = document.querySelectorAll('.conversation-row');
+    rows.forEach(row => {
+        row.addEventListener('mouseenter', function() {
+            this.classList.add('table-active');
+        });
+        row.addEventListener('mouseleave', function() {
+            this.classList.remove('table-active');
+        });
+    });
 
-    // Create the statistics chart
-    const statsCtx = document.getElementById('conversationStatsChart').getContext('2d');
-    new Chart(statsCtx, {
-        type: 'bar',
-        data: statsData,
-        options: {
-            scales: {
-                y: {
-                    beginAtZero: true
+    // Keyboard navigation
+    let currentRow = -1;
+    const totalRows = rows.length;
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (currentRow < totalRows - 1) {
+                if (currentRow >= 0) {
+                    rows[currentRow].classList.remove('table-active');
                 }
+                currentRow++;
+                rows[currentRow].classList.add('table-active');
+                rows[currentRow].scrollIntoView({ block: 'nearest' });
             }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (currentRow > 0) {
+                rows[currentRow].classList.remove('table-active');
+                currentRow--;
+                rows[currentRow].classList.add('table-active');
+                rows[currentRow].scrollIntoView({ block: 'nearest' });
+            }
+        } else if (e.key === 'Enter' && currentRow >= 0) {
+            e.preventDefault();
+            rows[currentRow].click();
         }
     });
+});
+
+// Function to change per page setting
+function changePerPage(perPage) {
+    const url = new URL(window.location);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', 1); // Reset to page 1 when changing per page
+    window.location.href = url.toString();
+}
 </script>
 {% endblock %}
