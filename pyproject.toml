@@ -124,7 +124,7 @@ target-version = "py38"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "B", "C4", "UP", "PL", "RUF"]
-ignore = ["E203", "E501"]
+ignore = ["E203", "E501", "PLR2004", "PLR0912"]  # Ignore magic value and too many branches warnings
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"

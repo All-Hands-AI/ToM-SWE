@@ -83,17 +83,17 @@ async def analyze_user():
         processed_data_dir="./data/processed_data",
         model="gpt-4o-mini"
     )
-    
+
     # Analyze a single message
     analysis = await analyzer.analyze_user_message("Help me debug this code")
     print(f"Intent: {analysis.intent}, Emotions: {analysis.emotions}")
-    
+
     # Analyze a user session
     result = await analyzer.analyze_user_mental_state("user_id", "session_id")
     if result:
         analyses, messages = result
         print(f"Analyzed {len(analyses)} messages concurrently")
-    
+
     # Process all sessions for a user (concurrent processing)
     await analyzer.process_all_user_sessions("user_id", "./data/user_model")
 
@@ -114,10 +114,10 @@ from tom_module.tom_module import (
 async def quick_analysis():
     # Analyze a single session
     result = await analyze_user_async("user_id", "session_id")
-    
+
     # Process a single session
     await process_user_session_async("user_id", "session_id")
-    
+
     # Process all sessions for a user
     await process_all_sessions_async("user_id")
 
@@ -134,15 +134,15 @@ from tom_module.tom_module import UserMentalStateAnalyzer
 
 async def process_multiple_users():
     analyzer = UserMentalStateAnalyzer("./data/processed_data")
-    
+
     user_ids = ["user1", "user2", "user3"]
-    
+
     # Process all users concurrently
     tasks = [
         analyzer.process_all_user_sessions(user_id, "./data/user_model")
         for user_id in user_ids
     ]
-    
+
     await asyncio.gather(*tasks)
     print("All users processed concurrently!")
 
@@ -167,7 +167,7 @@ The async implementation provides significant performance improvements:
 
 ### Concurrent Processing
 - **Multiple Messages**: Process all messages in a session concurrently
-- **Multiple Sessions**: Process all sessions for a user concurrently  
+- **Multiple Sessions**: Process all sessions for a user concurrently
 - **Multiple Users**: Process multiple users concurrently
 
 ### Performance Comparison
