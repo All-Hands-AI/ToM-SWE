@@ -54,20 +54,6 @@ class SessionSummary(BaseModel):
     session_start: str
     session_end: str
 
-    @property
-    def dominant_intents(self) -> List[str]:
-        """Get the most common intents in order of frequency."""
-        if not self.intent_distribution:
-            return []
-        return sorted(self.intent_distribution.keys(), key=lambda x: self.intent_distribution[x], reverse=True)
-
-    @property
-    def emotional_progression(self) -> List[str]:
-        """Get the most common emotions in order of frequency."""
-        if not self.emotion_distribution:
-            return []
-        return sorted(self.emotion_distribution.keys(), key=lambda x: self.emotion_distribution[x], reverse=True)
-
 
 class UserProfile(BaseModel):
     user_id: str
@@ -79,10 +65,6 @@ class UserProfile(BaseModel):
     emotion_distribution: Dict[str, int]
     preference_summary: List[str] = Field(
         description="Summarized list of user preferences extracted from all sessions"
-    )
-    expertise_indicators: List[str] = Field(
-        default_factory=list,
-        description="List of indicators showing user's expertise level and areas of knowledge"
     )
 
 
