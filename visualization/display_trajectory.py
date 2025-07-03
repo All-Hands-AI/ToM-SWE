@@ -43,8 +43,7 @@ def load_trajectory_data(user_id: str) -> Dict[str, Dict[str, Any]]:
         raise FileNotFoundError(f"Trajectory data not found: {data_path}")
 
     with open(data_path) as f:
-        data: Dict[str, Dict[str, Any]] = json.load(f)
-        return data
+        return json.load(f)
 
 
 def sort_conversations_by_time(

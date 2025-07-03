@@ -5,7 +5,6 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import numpy as np
 import datetime
 
@@ -46,21 +45,11 @@ def plot_complexity_over_time(analyses: List[Dict[str, Any]]) -> None:
     
     # Create the plot
     plt.figure(figsize=(10, 6))
-    
-    # Convert datetime objects to matplotlib date numbers for proper plotting
-    date_nums = mdates.date2num(timestamps)
-    plt.plot(date_nums, complexity_values, 'b-', marker='o')
-    
+    plt.plot(timestamps, complexity_values, 'b-', marker='o')
     plt.title("Code Complexity Over Time")
     plt.xlabel("Time")
     plt.ylabel("Cyclomatic Complexity")
     plt.grid(True)
-    
-    # Format x-axis to handle datetime objects properly
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
-    plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=1))
-    plt.xticks(rotation=45)
-    
     plt.tight_layout()
     plt.show()
 
