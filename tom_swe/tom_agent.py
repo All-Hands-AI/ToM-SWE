@@ -54,9 +54,9 @@ class UserContext:
 
     user_id: str
     user_profile: Optional[UserProfile] = None
-    recent_sessions: List[SessionSummary] = None
+    recent_sessions: Optional[List[SessionSummary]] = None
     current_query: Optional[str] = None
-    preferences: List[str] = None
+    preferences: Optional[List[str]] = None
     mental_state_summary: Optional[str] = None
 
 
@@ -263,7 +263,7 @@ User Context:
 - User ID: {user_context.user_id}
 - Mental State Summary: {user_context.mental_state_summary}
 - Preferences: {', '.join(user_context.preferences or [])}
-- Recent Session Count: {len(user_context.recent_sessions)}
+- Recent Session Count: {len(user_context.recent_sessions or [])}
 
 Relevant User Behavior Patterns:
 {relevant_behavior}
@@ -334,9 +334,10 @@ Format your response as JSON:
         workflow_patterns = rag_results.get("response", "")
 
         # Analyze recent session patterns
-        recent_intents = []
-        recent_emotions = []
-        for session in user_context.recent_sessions[-3:]:  # Last 3 sessions
+        recent_intents: List[str] = []
+        recent_emotions: List[str] = []
+        recent_sessions = user_context.recent_sessions or []
+        for session in recent_sessions[-3:]:  # Last 3 sessions
             recent_intents.extend(session.intent_distribution.keys())
             recent_emotions.extend(session.emotion_distribution.keys())
 
@@ -495,7 +496,7 @@ Provide a 2-3 sentence summary that:
 async def create_tom_agent(
     processed_data_dir: str = "./data/processed_data",
     user_model_dir: str = "./data/user_model",
-    **kwargs,
+    **kwargs: Any,
 ) -> ToMAgent:
     """
     Create and initialize a ToM agent.
@@ -515,7 +516,7 @@ async def create_tom_agent(
 # Example usage
 if __name__ == "__main__":
 
-    async def main():
+    async def main() -> None:
         # Create ToM agent
         agent = await create_tom_agent()
 

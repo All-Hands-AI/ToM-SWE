@@ -266,7 +266,9 @@ class UserMentalStateAnalyzer:
         self, message: str, session_context: Optional[List[str]] = None
     ) -> str:
         """Build the prompt for analyzing a single user message."""
-        parser = PydanticOutputParser(pydantic_object=UserMessageAnalysis)
+        parser: PydanticOutputParser[UserMessageAnalysis] = PydanticOutputParser(
+            pydantic_object=UserMessageAnalysis
+        )
         format_instructions = parser.get_format_instructions()
 
         # Build context from previous messages in session
@@ -324,7 +326,9 @@ Analyze this user message to a coding assistant across four dimensions. Provide 
         )
 
         # Use Pydantic parser for structured output
-        parser = PydanticOutputParser(pydantic_object=UserDescriptionAndPreferences)
+        parser: PydanticOutputParser[UserDescriptionAndPreferences] = PydanticOutputParser(
+            pydantic_object=UserDescriptionAndPreferences
+        )
         format_instructions = parser.get_format_instructions()
 
         # Single LLM call for both description and preferences
@@ -347,7 +351,8 @@ Observed Preferences: {all_preferences_text}
             return UserDescriptionAndPreferences(
                 description="New user with no session history yet.", preferences=[]
             )
-        return parser.parse(result)
+        parsed_result: UserDescriptionAndPreferences = parser.parse(result)
+        return parsed_result
 
     # ===================================================================
     # MESSAGE ANALYSIS GROUP
@@ -359,7 +364,9 @@ Observed Preferences: {all_preferences_text}
         """
         Comprehensive analysis of a user message to extract intent, emotions, preferences, and constraints.
         """
-        parser = PydanticOutputParser(pydantic_object=UserMessageAnalysis)
+        parser: PydanticOutputParser[UserMessageAnalysis] = PydanticOutputParser(
+            pydantic_object=UserMessageAnalysis
+        )
         prompt = self.build_message_analysis_prompt(message, session_context)
 
         print("\n[bold blue]Analyzing user message:[/bold blue]")
@@ -376,7 +383,7 @@ Observed Preferences: {all_preferences_text}
                 should_ask_clarification=False,
             )
 
-        structured_result = parser.parse(result)
+        structured_result: UserMessageAnalysis = parser.parse(result)
         print("\n[bold green]Result:[/bold green]")
         print(structured_result)
         return structured_result

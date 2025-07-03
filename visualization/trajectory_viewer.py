@@ -303,7 +303,8 @@ class TrajectoryViewer:
             # Get list of available users
             user_files = list(self.data_dir.glob("analysis_*.json"))
             users = [f.stem.replace("analysis_", "") for f in user_files]
-            return render_template("index.html", users=users)
+            result: str = render_template("index.html", users=users)
+            return result
 
         @self.app.route("/user/<user_id>")
         def user_trajectory(user_id: str) -> str:
@@ -311,7 +312,10 @@ class TrajectoryViewer:
             analysis_file = self.data_dir / f"analysis_{user_id}.json"
 
             if not analysis_file.exists():
-                return render_template("error.html", message=f"No data found for user {user_id}")
+                error_result: str = render_template(
+                    "error.html", message=f"No data found for user {user_id}"
+                )
+                return error_result
 
             with open(analysis_file) as f:
                 analysis_data = json.load(f)
@@ -319,12 +323,13 @@ class TrajectoryViewer:
             # Create visualization
             vis_path = create_interactive_visualization(analysis_data.get("results", []), user_id)
 
-            return render_template(
+            final_result: str = render_template(
                 "trajectory.html",
                 user_id=user_id,
                 visualization_path=vis_path,
                 analysis_data=analysis_data,
             )
+            return final_result
 
         @self.app.route("/api/users")
         def api_users() -> Any:
