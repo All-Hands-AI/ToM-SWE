@@ -1,4 +1,4 @@
-name: Mypy
+name: Pre-commit
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,27 +13,19 @@ on:
       - main
 
 jobs:
-  Static-Type-Checking:
+  pre-commit:
     runs-on: ubuntu-latest
-    strategy:
-      max-parallel: 5
-      matrix:
-        python-version: ["3.12"]
-
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Display Python version
-      run: python -c "import sys; print(sys.version)"
+        python-version: '3.12'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         python -m pip install uv
         uv sync --extra dev
-    - name: Type-checking package with mypy
+    - name: Run pre-commit
       run: |
-        # Run mypy against our main package modules
-        uv run mypy tom_module utils visualization
+        uv run pre-commit run --all-files

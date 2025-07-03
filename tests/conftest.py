@@ -8,7 +8,7 @@ import tempfile
 
 import pytest
 
-from tom_module.tom_module import UserMentalStateAnalyzer, UserMessageAnalysis
+from tom_swe.tom_module import UserMentalStateAnalyzer, UserMessageAnalysis
 
 
 @pytest.fixture

@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from tom_module.tom_module import (
+from tom_swe.tom_module import (
     SessionSummary,
     UserMessageAnalysis,
 )

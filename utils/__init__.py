@@ -1,20 +1,20 @@
 """Utility functions for ToM-SWE."""
 
 from .code_metrics import (
-    count_lines,
-    count_functions,
-    count_classes,
     calculate_cyclomatic_complexity,
+    count_classes,
+    count_functions,
+    count_lines,
 )
-from .llm_client import LLMClient
 from .data_utils import load_json, save_json
+from .llm_client import LLMClient
 
 __all__ = [
-    "count_lines",
-    "count_functions",
-    "count_classes",
-    "calculate_cyclomatic_complexity",
     "LLMClient",
+    "calculate_cyclomatic_complexity",
+    "count_classes",
+    "count_functions",
+    "count_lines",
     "load_json",
     "save_json",
 ]

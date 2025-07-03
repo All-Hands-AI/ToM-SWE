@@ -6,13 +6,13 @@ predict their intentions, and anticipate their next actions based on their
 typed messages and interaction patterns using Large Language Models.
 """
 
-from tom_module.database import (
+from tom_swe.database import (
     OverallUserAnalysis,
     SessionSummary,
     UserMessageAnalysis,
     UserProfile,
 )
-from tom_module.rag_agent import (
+from tom_swe.rag_module import (
     ContextualVectorDB,
     Document,
     RAGAgent,
@@ -22,7 +22,15 @@ from tom_module.rag_agent import (
     load_processed_data,
     load_user_model_data,
 )
-from tom_module.tom_module import (
+from tom_swe.tom_agent import (
+    InstructionRecommendation,
+    NextActionSuggestion,
+    PersonalizedGuidance,
+    ToMAgent,
+    UserContext,
+    create_tom_agent,
+)
+from tom_swe.tom_module import (
     UserMentalStateAnalyzer,
 )
 
@@ -31,17 +39,23 @@ __author__ = "Research Team"
 __description__ = "LLM-powered Theory of Mind analysis for user behavior prediction"
 
 __all__ = [
+    "ContextualVectorDB",
+    "Document",
+    "InstructionRecommendation",
+    "NextActionSuggestion",
+    "OverallUserAnalysis",
+    "PersonalizedGuidance",
+    "RAGAgent",
+    "RetrievalResult",
+    "SessionSummary",
+    "ToMAgent",
+    "UserContext",
     "UserMentalStateAnalyzer",
     "UserMessageAnalysis",
-    "SessionSummary",
     "UserProfile",
-    "OverallUserAnalysis",
-    "RAGAgent",
-    "Document",
     "VectorDB",
-    "ContextualVectorDB",
-    "RetrievalResult",
     "create_rag_agent",
+    "create_tom_agent",
     "load_processed_data",
     "load_user_model_data",
 ]

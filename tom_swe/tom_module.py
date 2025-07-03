@@ -270,9 +270,10 @@ class UserMentalStateAnalyzer:
         format_instructions = parser.get_format_instructions()
 
         # Build context from previous messages in session
+        context_str = "\n".join(session_context or [])
         context_info = f"""
 Session context (recent messages):
-{"\n".join(session_context or [])}
+{context_str}
 """
 
         return f"""
