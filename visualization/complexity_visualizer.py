@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
 import datetime
 
@@ -45,7 +46,7 @@ def plot_complexity_over_time(analyses: List[Dict[str, Any]]) -> None:
     
     # Create the plot
     plt.figure(figsize=(10, 6))
-    plt.plot(timestamps, complexity_values, 'b-', marker='o')
+    plt.plot(mdates.date2num(timestamps), complexity_values, 'b-', marker='o')
     plt.title("Code Complexity Over Time")
     plt.xlabel("Time")
     plt.ylabel("Cyclomatic Complexity")
