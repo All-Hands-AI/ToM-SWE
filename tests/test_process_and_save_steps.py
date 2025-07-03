@@ -133,24 +133,24 @@ class TestStep2SaveSessionAnalysesToJsonl:
 
         # Check file was created
         expected_path = os.path.join(
-            base_dir, "user_model_detailed", user_id, f"{session_id}.jsonl"
+            base_dir, "user_model_detailed", user_id, f"{session_id}.json"
         )
         assert os.path.exists(expected_path)
 
         # Check file content
         with open(expected_path, encoding="utf-8") as f:
-            lines = f.readlines()
+            data = json.load(f)
 
-        assert len(lines) == len(sample_message_analyses)
+        assert len(data["message_analyses"]) == len(sample_message_analyses)
 
-        # Verify each line is valid JSON with expected structure
-        for i, line in enumerate(lines):
-            data = json.loads(line.strip())
-            assert "message_index" in data
-            assert "timestamp" in data
-            assert "analysis" in data
-            assert data["message_index"] == i
-            assert isinstance(data["analysis"], dict)
+        # Verify each message analysis has expected structure
+        for i, message_analysis in enumerate(data["message_analyses"]):
+            assert "message_index" in message_analysis
+            assert "timestamp" in message_analysis
+            assert "analysis" in message_analysis
+            assert "original_message" in message_analysis
+            assert message_analysis["message_index"] == i
+            assert isinstance(message_analysis["analysis"], dict)
 
     @pytest.mark.asyncio
     async def test_save_session_analyses_to_jsonl_empty_analyses(self, analyzer_with_temp_dir):
@@ -160,13 +160,13 @@ class TestStep2SaveSessionAnalysesToJsonl:
 
         await analyzer.save_session_analyses_to_jsonl_legacy("user", "session", [], base_dir)
 
-        expected_path = os.path.join(base_dir, "user_model_detailed", "user", "session.jsonl")
+        expected_path = os.path.join(base_dir, "user_model_detailed", "user", "session.json")
         assert os.path.exists(expected_path)
 
-        # File should be empty
+        # File should contain empty message_analyses array
         with open(expected_path, encoding="utf-8") as f:
-            content = f.read()
-        assert content == ""
+            data = json.load(f)
+        assert len(data["message_analyses"]) == 0
 
 
 class TestStep3SummarizeSessionFromAnalyses:
@@ -256,8 +256,8 @@ class TestStep4UpdateOverallUserAnalysis:
             session_id="test_session",
             timestamp=datetime.now(),
             message_count=3,
-            dominant_intents=["debugging"],
-            emotional_progression=["frustrated", "confused"],
+            intent_distribution={"debugging": 3},
+            emotion_distribution={"frustrated": 2, "confused": 1},
             key_preferences=["detailed_help"],
             user_modeling_summary="user needs debugging help",
             clarification_requests=1,
@@ -265,7 +265,7 @@ class TestStep4UpdateOverallUserAnalysis:
             session_end="2024-01-15T10:30:00",
         )
 
-        await analyzer.save_updated_user_profile(user_id, session_summary, base_dir)
+        await analyzer.save_updated_user_profile(user_id, [session_summary], base_dir)
 
         # Check file was created
         expected_path = os.path.join(base_dir, "user_model_overall", f"{user_id}.json")
@@ -292,19 +292,19 @@ class TestStep4UpdateOverallUserAnalysis:
             "user_profile": {
                 "user_id": user_id,
                 "total_sessions": 1,
-                "expertise_indicators": [],
-                "communication_patterns": [],
-                "preference_evolution": {},
+                "overall_description": "Initial user profile",
                 "intent_distribution": {"debugging": 1},
-                "learning_trajectory": "",
+                "emotion_distribution": {"confused": 1},
+                "preference_summary": [],
+                "expertise_indicators": [],
             },
             "session_summaries": [
                 {
                     "session_id": "old_session",
                     "timestamp": "2024-01-01T00:00:00",
                     "message_count": 2,
-                    "dominant_intents": ["debugging"],
-                    "emotional_progression": ["confused"],
+                    "intent_distribution": {"debugging": 1},
+                    "emotion_distribution": {"confused": 1},
                     "key_preferences": [],
                     "user_modeling_summary": "",
                     "clarification_requests": 0,
@@ -325,8 +325,8 @@ class TestStep4UpdateOverallUserAnalysis:
             session_id="new_session",
             timestamp=datetime.now(),
             message_count=1,
-            dominant_intents=["optimization"],
-            emotional_progression=["focused"],
+            intent_distribution={"optimization": 1},
+            emotion_distribution={"focused": 1},
             key_preferences=["performance_tips"],
             user_modeling_summary="ML focused",
             clarification_requests=0,
@@ -334,7 +334,7 @@ class TestStep4UpdateOverallUserAnalysis:
             session_end="2024-01-15T10:30:00",
         )
 
-        await analyzer.save_updated_user_profile(user_id, new_session_summary, base_dir)
+        await analyzer.save_updated_user_profile(user_id, [new_session_summary], base_dir)
 
         # Check updated content
         with open(overall_path, encoding="utf-8") as f:
@@ -359,17 +359,17 @@ class TestIntegrationProcessAndSaveUserSession:
 
         # Mock the analyze_all_session_messages method
         with patch.object(analyzer, "analyze_all_session_messages", mock_analyze_user_mental_state):
-            await analyzer.process_and_save_single_session(user_id, session_id, base_dir)
+            await analyzer.process_and_save_single_session(user_id, session_id, base_dir=base_dir)
 
         # Check that all three tiers were created
 
         # Tier 1: JSONL file
-        jsonl_path = os.path.join(base_dir, "user_model_detailed", user_id, f"{session_id}.jsonl")
+        jsonl_path = os.path.join(base_dir, "user_model_detailed", user_id, f"{session_id}.json")
         assert os.path.exists(jsonl_path)
 
         with open(jsonl_path, encoding="utf-8") as f:
-            lines = f.readlines()
-        assert len(lines) == EXPECTED_USER_MESSAGE_COUNT  # Two analyses from mock
+            data = json.load(f)
+        assert len(data["message_analyses"]) == EXPECTED_USER_MESSAGE_COUNT  # Two analyses from mock
 
         # Tier 2 & 3: Overall analysis file
         overall_path = os.path.join(base_dir, "user_model_overall", f"{user_id}.json")
@@ -391,10 +391,10 @@ class TestIntegrationProcessAndSaveUserSession:
 
         # Mock analyze_all_session_messages to return empty list
         with patch.object(analyzer, "analyze_all_session_messages", return_value=([], [])):
-            await analyzer.process_and_save_single_session(user_id, "session_001", base_dir)
+            await analyzer.process_and_save_single_session(user_id, "session_001", base_dir=base_dir)
 
         # Should not create any files
-        jsonl_path = os.path.join(base_dir, "user_model_detailed", user_id, "session_001.jsonl")
+        jsonl_path = os.path.join(base_dir, "user_model_detailed", user_id, "session_001.json")
         overall_path = os.path.join(base_dir, "user_model_overall", f"{user_id}.json")
 
         assert not os.path.exists(jsonl_path)
@@ -412,10 +412,10 @@ class TestIntegrationProcessAndSaveUserSession:
 
         # Check that both sessions were processed
         session_001_path = os.path.join(
-            base_dir, "user_model_detailed", user_id, "session_001.jsonl"
+            base_dir, "user_model_detailed", user_id, "session_001.json"
         )
         session_002_path = os.path.join(
-            base_dir, "user_model_detailed", user_id, "session_002.jsonl"
+            base_dir, "user_model_detailed", user_id, "session_002.json"
         )
 
         assert os.path.exists(session_001_path)
@@ -467,8 +467,8 @@ class TestUtilityFunctions:
             session_id="s1",
             timestamp=datetime.now(),
             message_count=2,
-            dominant_intents=["debugging", "optimization"],
-            emotional_progression=["frustrated"],
+            intent_distribution={"debugging": 1, "optimization": 1},
+            emotion_distribution={"frustrated": 1},
             key_preferences=["detailed_help"],
             user_modeling_summary="python debugging expert",
             clarification_requests=1,
@@ -480,8 +480,8 @@ class TestUtilityFunctions:
             session_id="s2",
             timestamp=datetime.now(),
             message_count=1,
-            dominant_intents=["debugging"],
-            emotional_progression=["confident"],
+            intent_distribution={"debugging": 1},
+            emotion_distribution={"confident": 1},
             key_preferences=["quick_tips"],
             user_modeling_summary="experienced developer",
             clarification_requests=0,
