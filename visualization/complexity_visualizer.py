@@ -4,6 +4,7 @@ import datetime
 import logging
 from typing import Any, Dict, List
 
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ def plot_complexity_over_time(analyses: List[Dict[str, Any]]) -> None:
 
     # Create the plot
     plt.figure(figsize=(10, 6))
-    plt.plot(timestamps, complexity_values, "b-", marker="o")
+    plt.plot(mdates.date2num(timestamps), complexity_values, "b-", marker="o")
     plt.title("Code Complexity Over Time")
     plt.xlabel("Time")
     plt.ylabel("Cyclomatic Complexity")
