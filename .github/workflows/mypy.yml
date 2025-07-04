@@ -36,4 +36,4 @@ jobs:
     - name: Type-checking package with mypy
       run: |
         # Run mypy against our main package modules
-        uv run mypy tom_module utils visualization
+        uv run mypy tom_swe utils visualization

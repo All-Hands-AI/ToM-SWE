@@ -37,7 +37,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
+    "pytest-cov>=6.2.1",
     "black>=22.0.0",
     "isort>=5.0.0",
     "mypy>=1.0.0",
@@ -70,7 +70,7 @@ profile = "black"
 line_length = 100
 
 [tool.hatch.build.targets.wheel]
-packages = ["tom_module"]
+packages = ["tom_swe"]
 
 [tool.mypy]
 python_version = "3.8"

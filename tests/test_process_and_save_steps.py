@@ -64,8 +64,8 @@ class TestStep1AnalyzeUserMentalState:
     """Test Step 1: analyze_user_mental_state function."""
 
     @pytest.mark.asyncio
-    @patch("tom_module.tom_module.UserMentalStateAnalyzer.call_llm")
-    @patch("tom_module.tom_module.PydanticOutputParser")
+    @patch("tom_swe.tom_module.UserMentalStateAnalyzer.call_llm")
+    @patch("tom_swe.tom_module.PydanticOutputParser")
     async def test_analyze_user_mental_state_success(self, mock_parser, mock_llm, user_file_setup):
         """Test successful analysis of user mental state."""
         analyzer, temp_dir, user_id = user_file_setup
