@@ -12,8 +12,8 @@ import json
 from pathlib import Path
 from typing import List
 
-from tom_module.rag_agent import Document, RAGAgent, VectorDB
-from tom_module.utils import split_text_for_embedding
+from tom_swe.rag_module import Document, RAGAgent, VectorDB
+from tom_swe.utils import split_text_for_embedding
 
 # Constants
 CONTENT_PREVIEW_LENGTH = 150
@@ -47,7 +47,6 @@ def load_user_session_documents(
             session_content = json.dumps(session_data, indent=2)
             # Split if too large for embedding
             content_chunks = split_text_for_embedding(session_content)
-            breakpoint()
             for i, chunk_content in enumerate(content_chunks):
                 chunk_id = (
                     f"{user_id}_{session_id}"
@@ -128,7 +127,6 @@ async def demonstrate_simple_user_rag() -> None:
     for query in queries:
         print(f"\nQuery: {query}")
         results = rag_agent.retrieve(query, k=3)
-        breakpoint()
 
         print("Retrieved sessions:")
         for i, result in enumerate(results, 1):

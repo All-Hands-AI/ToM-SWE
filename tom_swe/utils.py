@@ -23,9 +23,12 @@ class PydanticOutputParser(OutputParser[T], Generic[T]):
         json_result = json_repair.loads(result)
         assert isinstance(json_result, dict)
         if "properties" in json_result:
-            return self.pydantic_object.model_validate_json(json.dumps(json_result["properties"]))
+            validated_result: T = self.pydantic_object.model_validate_json(
+                json.dumps(json_result["properties"])
+            )
+            return validated_result
         else:
-            parsed_result = self.pydantic_object.model_validate_json(result)
+            parsed_result: T = self.pydantic_object.model_validate_json(result)
             return parsed_result
 
     def get_format_instructions(self) -> str:

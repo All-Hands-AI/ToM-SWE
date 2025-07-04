@@ -5,21 +5,22 @@ Test fixtures and mock data for tom_module tests.
 import json
 import os
 import tempfile
+from typing import Any, Dict, Generator, List
 
 import pytest
 
-from tom_module.tom_module import UserMentalStateAnalyzer, UserMessageAnalysis
+from tom_swe.tom_module import UserMentalStateAnalyzer, UserMessageAnalysis
 
 
 @pytest.fixture
-def temp_dir():
+def temp_dir() -> Generator[str, None, None]:
     """Create a temporary directory for tests."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         yield tmp_dir
 
 
 @pytest.fixture
-def sample_user_data():
+def sample_user_data() -> Dict[str, Any]:
     """Sample user data with multiple sessions."""
     return {
         "session_001": {
@@ -63,13 +64,13 @@ def sample_user_data():
 
 
 @pytest.fixture
-def empty_user_data():
+def empty_user_data() -> Dict[str, Any]:
     """User data with no sessions."""
     return {}
 
 
 @pytest.fixture
-def sample_message_analyses():
+def sample_message_analyses() -> List[UserMessageAnalysis]:
     """Sample UserMessageAnalysis objects for testing."""
     return [
         UserMessageAnalysis(
@@ -97,7 +98,7 @@ def sample_message_analyses():
 
 
 @pytest.fixture
-def mock_llm_response():
+def mock_llm_response() -> str:
     """Mock LLM response for testing."""
     return """
     {
@@ -111,7 +112,7 @@ def mock_llm_response():
 
 
 @pytest.fixture
-def analyzer_with_temp_dir(temp_dir):
+def analyzer_with_temp_dir(temp_dir: str) -> tuple[UserMentalStateAnalyzer, str]:
     """UserMentalStateAnalyzer with temporary directories."""
     processed_data_dir = os.path.join(temp_dir, "processed_data")
     os.makedirs(processed_data_dir, exist_ok=True)
@@ -121,7 +122,9 @@ def analyzer_with_temp_dir(temp_dir):
 
 
 @pytest.fixture
-def user_file_setup(analyzer_with_temp_dir, sample_user_data):
+def user_file_setup(
+    analyzer_with_temp_dir: tuple[UserMentalStateAnalyzer, str], sample_user_data: Dict[str, Any]
+) -> tuple[UserMentalStateAnalyzer, str, str]:
     """Set up a user file with sample data."""
     analyzer, temp_dir = analyzer_with_temp_dir
     user_id = "test_user_123"
@@ -135,10 +138,12 @@ def user_file_setup(analyzer_with_temp_dir, sample_user_data):
 
 
 @pytest.fixture
-def mock_analyze_user_mental_state():
+def mock_analyze_user_mental_state() -> Any:
     """Mock the analyze_all_session_messages method."""
 
-    async def _mock_method(user_id, session_id):
+    async def _mock_method(
+        user_id: str, session_id: str
+    ) -> tuple[List[UserMessageAnalysis], List[str]]:
         # Return different analyses based on session_id for testing
         if session_id == "session_001":
             analyses = [

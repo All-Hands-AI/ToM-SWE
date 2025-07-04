@@ -9,7 +9,7 @@ import sys
 import pytest
 
 
-def main():
+def main() -> int:
     """Run all tests with pytest."""
 
     # Change to project root directory
@@ -43,7 +43,7 @@ def main():
     else:
         print(f"\n❌ Tests failed with exit code: {exit_code}")
 
-    return exit_code
+    return int(exit_code)
 
 
 if __name__ == "__main__":

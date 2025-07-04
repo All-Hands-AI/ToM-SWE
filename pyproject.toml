@@ -11,7 +11,7 @@ authors = [
 ]
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.9"
+requires-python = ">=3.12, <3.13"
 dependencies = [
     "pandas>=2.0.0",
     "numpy>=1.24.0",
@@ -37,6 +37,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
+    "pytest-cov>=6.2.1",
     "black>=22.0.0",
     "isort>=5.0.0",
     "mypy>=1.0.0",
@@ -45,11 +46,11 @@ dev = [
 ]
 
 [project.scripts]
-tom-analyze = "tom_module.tom_module:main"
-tom-test = "tom_module.test_tom_module:test_tom_module"
+tom-analyze = "tom_swe.tom_module:main"
+tom-test = "tom_swe.test_tom_module:test_tom_module"
 tom-config = "configure_llm:main"
 user-analysis = "user_interaction_analysis:main"
-rag-agent = "tom_module.rag_agent:main"
+rag-agent = "tom_swe.rag_module:main"
 
 [tool.uv]
 dev-dependencies = [
@@ -69,7 +70,7 @@ profile = "black"
 line_length = 100
 
 [tool.hatch.build.targets.wheel]
-packages = ["tom_module"]
+packages = ["tom_swe"]
 
 [tool.mypy]
 python_version = "3.8"
@@ -125,13 +126,13 @@ target-version = "py38"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "B", "C4", "UP", "PL", "RUF"]
-ignore = ["E203", "E501"]
+ignore = ["E501", "PLR0912", "PLR2004"]
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.isort]
-known-first-party = ["tom_module"]
+known-first-party = ["tom_swe"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
