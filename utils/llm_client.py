@@ -96,7 +96,7 @@ class LLMClient:
                 max_tokens=self.max_tokens,
             )
             content = response.choices[0].message.content
-            return content.strip() if content is not None else ""
+            return str(content.strip() if content is not None else "")
         except Exception as e:
             logger.error(f"Error generating text with OpenAI: {e}")
             return f"Error: {e!s}"

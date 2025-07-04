@@ -111,13 +111,15 @@ def format_content(content: str, source: str = "", action: str = "", max_length:
     """Format content with truncation if too long, but preserve user messages."""
     # Don't truncate user messages or important content
     if source == "user" or action == "message":
-        return escape(content)
+        return str(escape(content))
 
     # For other content, use a more generous limit
     if len(content) <= max_length:
-        return escape(content)
+        return str(escape(content))
 
-    return escape(content[:max_length]) + "\n\n[dim]... (content truncated for readability)[/dim]"
+    return str(
+        escape(content[:max_length]) + "\n\n[dim]... (content truncated for readability)[/dim]"
+    )
 
 
 def filter_user_messages(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

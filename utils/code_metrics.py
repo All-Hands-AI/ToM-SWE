@@ -2,7 +2,7 @@
 
 import ast
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 
 def count_lines(code: str) -> int:
@@ -191,7 +191,7 @@ def extract_function_names(code: str) -> List[str]:
         return matches
 
 
-def extract_class_names(code: str) -> List[tuple]:
+def extract_class_names(code: str) -> List[Tuple[str, List[str]]]:
     """Extract class names and their base classes from code.
 
     Args:

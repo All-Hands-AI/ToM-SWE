@@ -177,7 +177,9 @@ def generate_behavior_report(behavior_data: Dict[str, Any]) -> str:
     if total_actions > 0:
         # Most common action
         if action_types:
-            most_common_action = max(action_types.items(), key=lambda x: x[1])
+            most_common_action = max(
+                action_types.items(), key=lambda x: x[1] if x[1] is not None else 0
+            )
         else:
             most_common_action = ("none", 0)
         report += f"  Most common action: {most_common_action[0]} ({most_common_action[1]} times)\n"

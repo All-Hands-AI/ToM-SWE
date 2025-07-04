@@ -219,7 +219,7 @@ def sort_conversations_by_user_messages(
         conversations.append((conv_id, conv_data, user_msg_count))
 
     # Sort by user message count
-    conversations.sort(key=lambda x: x[2], reverse=descending)
+    conversations.sort(key=lambda x: x[2] if x[2] is not None else 0, reverse=descending)
 
     # Return just the conv_id and conv_data
     return [(conv_id, conv_data) for conv_id, conv_data, _ in conversations]

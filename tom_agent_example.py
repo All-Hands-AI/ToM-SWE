@@ -34,7 +34,7 @@ async def demonstrate_user_context_analysis(agent: ToMAgent, user_id: str) -> No
     print(f"User ID: {user_context.user_id}")
     print(f"Mental State Summary: {user_context.mental_state_summary or 'No profile available'}")
     print(f"Preferences: {', '.join(user_context.preferences or ['None identified'])}")
-    print(f"Recent Sessions: {len(user_context.recent_sessions)} sessions analyzed")
+    print(f"Recent Sessions: {len(user_context.recent_sessions or [])} sessions analyzed")
 
     if user_context.recent_sessions:
         print("\nRecent Session Summary:")
