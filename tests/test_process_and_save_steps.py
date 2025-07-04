@@ -6,12 +6,14 @@ Updated for async tom_module.
 import json
 import os
 from datetime import datetime
+from typing import Any, List, Tuple
 from unittest.mock import Mock, patch
 
 import pytest
 
 from tom_swe.tom_module import (
     SessionSummary,
+    UserMentalStateAnalyzer,
     UserMessageAnalysis,
 )
 
@@ -24,7 +26,9 @@ class TestDataLoading:
     """Test data loading and session discovery functions."""
 
     @pytest.mark.asyncio
-    async def test_get_user_session_ids_valid_user(self, user_file_setup):
+    async def test_get_user_session_ids_valid_user(
+        self, user_file_setup: Tuple[UserMentalStateAnalyzer, str, str]
+    ) -> None:
         """Test getting session IDs for a valid user."""
         analyzer, temp_dir, user_id = user_file_setup
 
@@ -36,7 +40,9 @@ class TestDataLoading:
         assert "session_002" in session_ids
 
     @pytest.mark.asyncio
-    async def test_get_user_session_ids_missing_user(self, analyzer_with_temp_dir):
+    async def test_get_user_session_ids_missing_user(
+        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str]
+    ) -> None:
         """Test getting session IDs for non-existent user."""
         analyzer, temp_dir = analyzer_with_temp_dir
 
@@ -45,7 +51,9 @@ class TestDataLoading:
         assert session_ids == []
 
     @pytest.mark.asyncio
-    async def test_get_user_session_ids_empty_file(self, analyzer_with_temp_dir, empty_user_data):
+    async def test_get_user_session_ids_empty_file(
+        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str], empty_user_data: Any
+    ) -> None:
         """Test getting session IDs for user with empty data."""
         analyzer, temp_dir = analyzer_with_temp_dir
         user_id = "empty_user"
@@ -66,7 +74,12 @@ class TestStep1AnalyzeUserMentalState:
     @pytest.mark.asyncio
     @patch("tom_swe.tom_module.UserMentalStateAnalyzer.call_llm")
     @patch("tom_swe.tom_module.PydanticOutputParser")
-    async def test_analyze_user_mental_state_success(self, mock_parser, mock_llm, user_file_setup):
+    async def test_analyze_user_mental_state_success(
+        self,
+        mock_parser: Any,
+        mock_llm: Any,
+        user_file_setup: Tuple[UserMentalStateAnalyzer, str, str],
+    ) -> None:
         """Test successful analysis of user mental state."""
         analyzer, temp_dir, user_id = user_file_setup
 
@@ -90,7 +103,9 @@ class TestStep1AnalyzeUserMentalState:
         assert all(isinstance(analysis, UserMessageAnalysis) for analysis in analyses)
 
     @pytest.mark.asyncio
-    async def test_analyze_user_mental_state_missing_session(self, user_file_setup):
+    async def test_analyze_user_mental_state_missing_session(
+        self, user_file_setup: Tuple[UserMentalStateAnalyzer, str, str]
+    ) -> None:
         """Test analysis with non-existent session."""
         analyzer, temp_dir, user_id = user_file_setup
 
@@ -105,7 +120,9 @@ class TestStep1AnalyzeUserMentalState:
             assert messages == []
 
     @pytest.mark.asyncio
-    async def test_analyze_user_mental_state_missing_user(self, analyzer_with_temp_dir):
+    async def test_analyze_user_mental_state_missing_user(
+        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str]
+    ) -> None:
         """Test analysis with non-existent user."""
         analyzer, temp_dir = analyzer_with_temp_dir
 
@@ -119,8 +136,10 @@ class TestStep2SaveSessionAnalysesToJsonl:
 
     @pytest.mark.asyncio
     async def test_save_session_analyses_to_jsonl_success(
-        self, analyzer_with_temp_dir, sample_message_analyses
-    ):
+        self,
+        analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str],
+        sample_message_analyses: List[UserMessageAnalysis],
+    ) -> None:
         """Test successful saving of analyses to JSONL."""
         analyzer, temp_dir = analyzer_with_temp_dir
         user_id = "test_user"
@@ -158,7 +177,9 @@ class TestStep2SaveSessionAnalysesToJsonl:
             )
 
     @pytest.mark.asyncio
-    async def test_save_session_analyses_to_jsonl_empty_analyses(self, analyzer_with_temp_dir):
+    async def test_save_session_analyses_to_jsonl_empty_analyses(
+        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str]
+    ) -> None:
         """Test saving empty analyses list."""
         analyzer, temp_dir = analyzer_with_temp_dir
 
@@ -179,8 +200,10 @@ class TestStep3SummarizeSessionFromAnalyses:
     """Test Step 3: summarize_session_from_analyses function."""
 
     def test_summarize_session_from_analyses_success(
-        self, analyzer_with_temp_dir, sample_message_analyses
-    ):
+        self,
+        analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str],
+        sample_message_analyses: List[UserMessageAnalysis],
+    ) -> None:
         """Test successful session summarization."""
         analyzer, temp_dir = analyzer_with_temp_dir
         session_id = "test_session"
@@ -205,7 +228,9 @@ class TestStep3SummarizeSessionFromAnalyses:
         assert summary.session_start == "2024-01-15T10:00:00"
         assert summary.session_end == "2024-01-15T10:30:00"
 
-    def test_summarize_session_from_analyses_empty_list(self, analyzer_with_temp_dir):
+    def test_summarize_session_from_analyses_empty_list(
+        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str]
+    ) -> None:
         """Test summarization with empty analyses list."""
         analyzer, temp_dir = analyzer_with_temp_dir
 
@@ -213,7 +238,9 @@ class TestStep3SummarizeSessionFromAnalyses:
 
         assert summary is None
 
-    def test_summarize_session_intent_counting(self, analyzer_with_temp_dir):
+    def test_summarize_session_intent_counting(
+        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str]
+    ) -> None:
         """Test that intent counting works correctly."""
         analyzer, temp_dir = analyzer_with_temp_dir
 
@@ -245,6 +272,7 @@ class TestStep3SummarizeSessionFromAnalyses:
         summary = analyzer.create_session_summary_from_analyses("session", analyses, {})
 
         # Check that debugging is the most common intent
+        assert summary is not None
         assert summary.intent_distribution["debugging"] == 2  # Most common
         assert summary.intent_distribution["optimization"] == 1
 
@@ -253,7 +281,9 @@ class TestStep4UpdateOverallUserAnalysis:
     """Test Step 4: update_overall_user_analysis function."""
 
     @pytest.mark.asyncio
-    async def test_update_overall_user_analysis_new_user(self, analyzer_with_temp_dir):
+    async def test_update_overall_user_analysis_new_user(
+        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str]
+    ) -> None:
         """Test updating analysis for a new user."""
         analyzer, temp_dir = analyzer_with_temp_dir
         user_id = "new_user"
@@ -288,7 +318,9 @@ class TestStep4UpdateOverallUserAnalysis:
         assert data["session_summaries"][0]["session_id"] == "test_session"
 
     @pytest.mark.asyncio
-    async def test_update_overall_user_analysis_existing_user(self, analyzer_with_temp_dir):
+    async def test_update_overall_user_analysis_existing_user(
+        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str]
+    ) -> None:
         """Test updating analysis for an existing user."""
         analyzer, temp_dir = analyzer_with_temp_dir
         user_id = "existing_user"
@@ -356,8 +388,10 @@ class TestIntegrationProcessAndSaveUserSession:
 
     @pytest.mark.asyncio
     async def test_process_and_save_user_session_success(
-        self, user_file_setup, mock_analyze_user_mental_state
-    ):
+        self,
+        user_file_setup: Tuple[UserMentalStateAnalyzer, str, str],
+        mock_analyze_user_mental_state: Any,
+    ) -> None:
         """Test complete process_and_save_user_session pipeline."""
         analyzer, temp_dir, user_id = user_file_setup
         session_id = "session_001"
@@ -366,7 +400,7 @@ class TestIntegrationProcessAndSaveUserSession:
         # Mock the analyze_all_session_messages method
         with patch.object(analyzer, "analyze_all_session_messages", mock_analyze_user_mental_state):
             session_summary = await analyzer.process_and_save_single_session(
-                user_id, session_id, base_dir
+                user_id, session_id, None
             )
 
             # Also update the user profile to create the overall analysis file
@@ -400,14 +434,16 @@ class TestIntegrationProcessAndSaveUserSession:
         assert data["session_summaries"][0]["session_id"] == session_id
 
     @pytest.mark.asyncio
-    async def test_process_and_save_user_session_no_analyses(self, user_file_setup):
+    async def test_process_and_save_user_session_no_analyses(
+        self, user_file_setup: Tuple[UserMentalStateAnalyzer, str, str]
+    ) -> None:
         """Test process_and_save_user_session when no analyses are found."""
         analyzer, temp_dir, user_id = user_file_setup
         base_dir = os.path.join(temp_dir, "user_model")
 
         # Mock analyze_all_session_messages to return empty list
         with patch.object(analyzer, "analyze_all_session_messages", return_value=([], [])):
-            await analyzer.process_and_save_single_session(user_id, "session_001", base_dir)
+            await analyzer.process_and_save_single_session(user_id, "session_001", None)
 
         # Should not create any files
         jsonl_path = os.path.join(base_dir, "user_model_detailed", user_id, "session_001.jsonl")
@@ -420,7 +456,9 @@ class TestIntegrationProcessAndSaveUserSession:
 class TestUtilityFunctions:
     """Test utility and helper functions."""
 
-    def test_ensure_directory_structure(self, analyzer_with_temp_dir):
+    def test_ensure_directory_structure(
+        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str]
+    ) -> None:
         """Test directory structure creation."""
         analyzer, temp_dir = analyzer_with_temp_dir
         base_dir = os.path.join(temp_dir, "user_model")
@@ -430,7 +468,9 @@ class TestUtilityFunctions:
         assert os.path.exists(os.path.join(base_dir, "user_model_detailed"))
         assert os.path.exists(os.path.join(base_dir, "user_model_overall"))
 
-    def test_create_new_user_analysis(self, analyzer_with_temp_dir):
+    def test_create_new_user_analysis(
+        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str]
+    ) -> None:
         """Test creating new user analysis structure."""
         analyzer, temp_dir = analyzer_with_temp_dir
         user_id = "test_user"
@@ -442,7 +482,9 @@ class TestUtilityFunctions:
         assert len(analysis.session_summaries) == 0
         assert isinstance(analysis.last_updated, datetime)
 
-    def test_update_user_profile(self, analyzer_with_temp_dir):
+    def test_update_user_profile(
+        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str]
+    ) -> None:
         """Test user profile update logic."""
         analyzer, temp_dir = analyzer_with_temp_dir
 

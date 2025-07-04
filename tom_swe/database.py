@@ -7,7 +7,7 @@ and serialization in the ToM module.
 """
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -81,3 +81,95 @@ class OverallUserAnalysis(BaseModel):
     user_profile: UserProfile
     session_summaries: List[SessionSummary]
     last_updated: datetime
+
+
+class InstructionImprovementResponse(BaseModel):
+    """Pydantic model for LLM response to instruction improvement requests."""
+
+    improved_instruction: str = Field(
+        description="The improved instruction personalized to the user's preferences and mental state"
+    )
+    reasoning: str = Field(
+        description="Clear reasoning for the improvements made, explaining why they are suited to this user"
+    )
+    confidence_score: float = Field(
+        ge=0.0, le=1.0, description="Confidence score (0-1) for the personalization quality"
+    )
+    personalization_factors: List[str] = Field(
+        description="Key personalization factors applied from the user's profile and preferences"
+    )
+
+
+class NextActionSuggestionLLM(BaseModel):
+    """Pydantic model for LLM response - a single next action suggestion."""
+
+    action_description: str = Field(description="Clear description of the suggested action")
+    priority: str = Field(description="Priority level of the action", pattern="^(high|medium|low)$")
+    reasoning: str = Field(
+        description="Reasoning for why this action is suggested based on user context"
+    )
+    expected_outcome: str = Field(description="Expected outcome or benefit of taking this action")
+    user_preference_alignment: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Score (0-1) indicating how well this action aligns with user preferences",
+    )
+
+
+class NextActionsResponse(BaseModel):
+    """Pydantic model for LLM response to next action suggestions requests."""
+
+    suggestions: List[NextActionSuggestionLLM] = Field(
+        min_length=1,
+        max_length=5,
+        description="List of 1-5 next action suggestions ranked by relevance and priority",
+    )
+
+
+class InstructionRecommendation(BaseModel):
+    """Pydantic model for an instruction recommendation."""
+
+    original_instruction: str = Field(description="The original instruction that was improved")
+    improved_instruction: str = Field(
+        description="The improved instruction personalized to the user"
+    )
+    reasoning: str = Field(description="Reasoning for the improvements made")
+    confidence_score: float = Field(
+        ge=0.0, le=1.0, description="Confidence score for the personalization quality"
+    )
+    personalization_factors: List[str] = Field(description="Key personalization factors applied")
+
+
+class NextActionSuggestion(BaseModel):
+    """Pydantic model for a next action suggestion."""
+
+    action_description: str = Field(description="Description of the suggested action")
+    priority: str = Field(description="Priority level: high, medium, or low")
+    reasoning: str = Field(description="Reasoning for the suggestion")
+    expected_outcome: str = Field(description="Expected outcome of taking this action")
+    user_preference_alignment: float = Field(
+        ge=0.0, le=1.0, description="Alignment score with user preferences"
+    )
+
+
+class UserContext(BaseModel):
+    """Pydantic model for user context."""
+
+    model_config = {"validate_assignment": True}
+
+    user_id: str = Field(description="The user's unique identifier")
+    user_profile: Optional[UserProfile] = None
+    recent_sessions: Optional[List[SessionSummary]] = None
+    current_query: Optional[str] = None
+    preferences: Optional[List[str]] = None
+    mental_state_summary: Optional[str] = None
+
+
+class PersonalizedGuidance(BaseModel):
+    """Pydantic model for complete personalized guidance."""
+
+    user_context: UserContext
+    instruction_recommendations: List[InstructionRecommendation]
+    next_action_suggestions: List[NextActionSuggestion]
+    overall_guidance: str
+    confidence_score: float

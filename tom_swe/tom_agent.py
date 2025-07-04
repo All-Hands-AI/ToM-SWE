@@ -19,7 +19,6 @@ import asyncio
 import json
 import logging
 import os
-from dataclasses import dataclass
 from typing import Any, List, Optional
 
 # Third-party imports
@@ -28,7 +27,14 @@ from dotenv import load_dotenv
 from litellm import acompletion
 
 # Local imports
-from .database import SessionSummary, UserProfile
+from .database import (
+    InstructionImprovementResponse,
+    InstructionRecommendation,
+    NextActionsResponse,
+    NextActionSuggestion,
+    PersonalizedGuidance,
+    UserContext,
+)
 from .rag_module import RAGAgent, create_rag_agent
 from .tom_module import UserMentalStateAnalyzer
 
@@ -46,51 +52,6 @@ litellm.set_verbose = False
 DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514")
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
 LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
-
-
-@dataclass
-class UserContext:
-    """Represents the current context for a user."""
-
-    user_id: str
-    user_profile: Optional[UserProfile] = None
-    recent_sessions: Optional[List[SessionSummary]] = None
-    current_query: Optional[str] = None
-    preferences: Optional[List[str]] = None
-    mental_state_summary: Optional[str] = None
-
-
-@dataclass
-class InstructionRecommendation:
-    """Represents a personalized instruction recommendation."""
-
-    original_instruction: str
-    improved_instruction: str
-    reasoning: str
-    confidence_score: float
-    personalization_factors: List[str]
-
-
-@dataclass
-class NextActionSuggestion:
-    """Represents a suggestion for the user's next action."""
-
-    action_description: str
-    priority: str  # "high", "medium", "low"
-    reasoning: str
-    expected_outcome: str
-    user_preference_alignment: float
-
-
-@dataclass
-class PersonalizedGuidance:
-    """Complete personalized guidance for a user."""
-
-    user_context: UserContext
-    instruction_recommendations: List[InstructionRecommendation]
-    next_action_suggestions: List[NextActionSuggestion]
-    overall_guidance: str
-    confidence_score: float
 
 
 class ToMAgent:
@@ -279,29 +240,28 @@ Please provide:
 2. Clear reasoning for the improvements made
 3. Confidence score (0-1) for the personalization
 4. Key personalization factors applied
-
-Format your response as JSON:
-{{
-    "improved_instruction": "...",
-    "reasoning": "...",
-    "confidence_score": 0.0-1.0,
-    "personalization_factors": ["factor1", "factor2", ...]
-}}
 """
 
-        response = await self._call_llm(prompt, temperature=0.2)
+        response = await self._call_llm(
+            prompt,
+            temperature=0.2,
+            response_format={
+                "type": "json_object",
+                "schema": InstructionImprovementResponse.model_json_schema(),
+            },
+        )
         if not response:
             return []
 
         try:
-            result = json.loads(response)
+            result = InstructionImprovementResponse.model_validate_json(response)
             return [
                 InstructionRecommendation(
                     original_instruction=original_instruction,
-                    improved_instruction=result.get("improved_instruction", original_instruction),
-                    reasoning=result.get("reasoning", ""),
-                    confidence_score=float(result.get("confidence_score", 0.5)),
-                    personalization_factors=result.get("personalization_factors", []),
+                    improved_instruction=result.improved_instruction,
+                    reasoning=result.reasoning,
+                    confidence_score=result.confidence_score,
+                    personalization_factors=result.personalization_factors,
                 )
             ]
         except (json.JSONDecodeError, ValueError) as e:
@@ -363,37 +323,30 @@ For each suggested action, provide:
 3. Reasoning for the suggestion
 4. Expected outcome
 5. Alignment with user preferences (0-1 score)
-
-Format as JSON array:
-[
-    {{
-        "action_description": "...",
-        "priority": "high|medium|low",
-        "reasoning": "...",
-        "expected_outcome": "...",
-        "user_preference_alignment": 0.0-1.0
-    }},
-    ...
-]
 """
 
-        response = await self._call_llm(prompt, temperature=0.3)
+        response = await self._call_llm(
+            prompt,
+            temperature=0.3,
+            response_format={
+                "type": "json_object",
+                "schema": NextActionsResponse.model_json_schema(),
+            },
+        )
         if not response:
             return []
 
         try:
-            results = json.loads(response)
+            result = NextActionsResponse.model_validate_json(response)
             suggestions = []
-            for result in results:
+            for llm_suggestion in result.suggestions:
                 suggestions.append(
                     NextActionSuggestion(
-                        action_description=result.get("action_description", ""),
-                        priority=result.get("priority", "medium"),
-                        reasoning=result.get("reasoning", ""),
-                        expected_outcome=result.get("expected_outcome", ""),
-                        user_preference_alignment=float(
-                            result.get("user_preference_alignment", 0.5)
-                        ),
+                        action_description=llm_suggestion.action_description,
+                        priority=llm_suggestion.priority,
+                        reasoning=llm_suggestion.reasoning,
+                        expected_outcome=llm_suggestion.expected_outcome,
+                        user_preference_alignment=llm_suggestion.user_preference_alignment,
                     )
                 )
             return suggestions
