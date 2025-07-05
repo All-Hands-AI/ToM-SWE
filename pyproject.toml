@@ -32,6 +32,10 @@ dependencies = [
     "wordcloud>=1.9.4",
     # RAG Agent dependencies
     "tqdm>=4.65.0",
+    # API dependencies
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "httpx>=0.25.0",
 ]
 
 [project.optional-dependencies]
@@ -51,6 +55,7 @@ tom-test = "tom_swe.test_tom_module:test_tom_module"
 tom-config = "configure_llm:main"
 user-analysis = "user_interaction_analysis:main"
 rag-agent = "tom_swe.rag_module:main"
+tom-api = "tom_swe.api.server:main"
 
 [tool.uv]
 dev-dependencies = [
