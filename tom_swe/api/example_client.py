@@ -87,7 +87,13 @@ async def check_api_health(client: ToMAgentClient) -> None:
     health = await client.health_check()
     print(f"✅ API Status: {health['status']}")
     print(f"📊 ToM Agent Ready: {health['tom_agent_ready']}")
-    print(f"🗣️  Active Conversations: {health['active_conversations']}")
+    print(f"🆔 API Version: {health.get('version', 'unknown')}")
+
+    # Handle both old and new API versions
+    if "active_conversations" in health:
+        print(f"🗣️  Active Conversations: {health['active_conversations']}")
+    else:
+        print("🗣️  Active Conversations: Not supported in this API version")
     print()
 
 

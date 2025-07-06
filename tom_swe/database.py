@@ -125,7 +125,7 @@ class NextActionsResponse(BaseModel):
 
     @validator("suggestions")
     def validate_suggestions_length(
-        self, v: List[NextActionSuggestionLLM]
+        cls, v: List[NextActionSuggestionLLM]  # noqa: N805
     ) -> List[NextActionSuggestionLLM]:
         if len(v) < 1 or len(v) > 5:
             raise ValueError("suggestions must contain 1-5 items")
