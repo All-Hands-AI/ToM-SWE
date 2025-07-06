@@ -9,7 +9,7 @@ and serialization in the ToM module.
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 
 class UserMessageAnalysis(BaseModel):
@@ -120,10 +120,16 @@ class NextActionsResponse(BaseModel):
     """Pydantic model for LLM response to next action suggestions requests."""
 
     suggestions: List[NextActionSuggestionLLM] = Field(
-        min_length=1,
-        max_length=5,
         description="List of 1-5 next action suggestions ranked by relevance and priority",
     )
+
+    @validator("suggestions")
+    def validate_suggestions_length(
+        self, v: List[NextActionSuggestionLLM]
+    ) -> List[NextActionSuggestionLLM]:
+        if len(v) < 1 or len(v) > 5:
+            raise ValueError("suggestions must contain 1-5 items")
+        return v
 
 
 class InstructionRecommendation(BaseModel):

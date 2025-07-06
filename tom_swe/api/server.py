@@ -14,7 +14,7 @@ from pathlib import Path
 import uvicorn
 
 
-def main():
+def main() -> None:
     """Main entry point for the API server."""
     parser = argparse.ArgumentParser(description="ToM Agent API Server")
     parser.add_argument(
@@ -50,28 +50,28 @@ def main():
         choices=["debug", "info", "warning", "error"],
         help="Log level (default: info)",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Set environment variables for the ToM agent
     os.environ["TOM_PROCESSED_DATA_DIR"] = args.processed_data_dir
     os.environ["TOM_USER_MODEL_DIR"] = args.user_model_dir
-    
+
     # Verify data directories exist
     processed_data_path = Path(args.processed_data_dir)
     user_model_path = Path(args.user_model_dir)
-    
+
     if not processed_data_path.exists():
         print(f"Warning: Processed data directory does not exist: {processed_data_path}")
         print("Creating directory...")
         processed_data_path.mkdir(parents=True, exist_ok=True)
-    
+
     if not user_model_path.exists():
         print(f"Warning: User model directory does not exist: {user_model_path}")
         print("Creating directory...")
         user_model_path.mkdir(parents=True, exist_ok=True)
-    
-    print(f"Starting ToM Agent API server...")
+
+    print("Starting ToM Agent API server...")
     print(f"Host: {args.host}")
     print(f"Port: {args.port}")
     print(f"Reload: {args.reload}")
@@ -79,7 +79,7 @@ def main():
     print(f"User model dir: {args.user_model_dir}")
     print(f"Log level: {args.log_level}")
     print()
-    
+
     try:
         uvicorn.run(
             "tom_swe.api.main:app",
