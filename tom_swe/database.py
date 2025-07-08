@@ -95,9 +95,6 @@ class InstructionImprovementResponse(BaseModel):
     confidence_score: float = Field(
         ge=0.0, le=1.0, description="Confidence score (0-1) for the personalization quality"
     )
-    personalization_factors: List[str] = Field(
-        description="Key personalization factors applied from the user's profile and preferences"
-    )
 
 
 class NextActionSuggestionLLM(BaseModel):
@@ -143,7 +140,6 @@ class InstructionRecommendation(BaseModel):
     confidence_score: float = Field(
         ge=0.0, le=1.0, description="Confidence score for the personalization quality"
     )
-    personalization_factors: List[str] = Field(description="Key personalization factors applied")
 
 
 class NextActionSuggestion(BaseModel):

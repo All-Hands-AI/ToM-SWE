@@ -148,7 +148,7 @@ async def retrieve_instructions(client: ToMAgentClient, user_id: str) -> None:
                 print(f"  {i}. Original: {rec['original_instruction']}")
                 print(f"     Improved: {rec['improved_instruction']}")
                 print(f"     Confidence: {rec['confidence_score']:.2f}")
-                print(f"     Factors: {', '.join(rec['personalization_factors'])}")
+                print(f"     Reasoning: {rec['reasoning']}")
             print(f"⏰ Calculated at: {instructions['calculated_at']}")
         else:
             print(f"⚠️  {instructions['message']}")

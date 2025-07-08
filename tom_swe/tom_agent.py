@@ -16,15 +16,15 @@ Key Features:
 """
 
 import asyncio
-import json
 import logging
 import os
+import time
+from dataclasses import dataclass
 from typing import Any, List, Optional
 
 # Third-party imports
 import litellm
 from dotenv import load_dotenv
-from litellm import acompletion
 
 # Local imports
 from .database import (
@@ -35,6 +35,7 @@ from .database import (
     PersonalizedGuidance,
     UserContext,
 )
+from .generation_utils.generate import LLMConfig, call_llm_simple, call_llm_structured
 from .rag_module import RAGAgent, create_rag_agent
 from .tom_module import UserMentalStateAnalyzer
 
@@ -54,6 +55,17 @@ LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
 LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
 
 
+@dataclass
+class ToMAgentConfig:
+    """Configuration for ToM Agent."""
+
+    processed_data_dir: str = "./data/processed_data"
+    user_model_dir: str = "./data/user_model"
+    llm_model: Optional[str] = None
+    use_contextual_rag: bool = True
+    enable_rag: bool = True
+
+
 class ToMAgent:
     """
     Theory of Mind Agent for personalized instruction generation and action recommendations.
@@ -62,36 +74,32 @@ class ToMAgent:
     to provide highly personalized guidance for software engineering tasks.
     """
 
-    def __init__(
-        self,
-        processed_data_dir: str = "./data/processed_data",
-        user_model_dir: str = "./data/user_model",
-        llm_model: Optional[str] = None,
-        use_contextual_rag: bool = True,
-    ):
+    def __init__(self, config: Optional[ToMAgentConfig] = None):
         """
         Initialize the ToM agent.
 
         Args:
-            processed_data_dir: Directory containing processed user data
-            user_model_dir: Directory containing user model data
-            llm_model: LLM model to use for generation
-            use_contextual_rag: Whether to use contextual embeddings in RAG
+            config: Configuration object for the ToM agent
         """
-        self.processed_data_dir = processed_data_dir
-        self.user_model_dir = user_model_dir
-        self.llm_model = llm_model or DEFAULT_LLM_MODEL
-        self.use_contextual_rag = use_contextual_rag
+        if config is None:
+            config = ToMAgentConfig()
+
+        self.processed_data_dir = config.processed_data_dir
+        self.user_model_dir = config.user_model_dir
+        self.llm_model = config.llm_model or DEFAULT_LLM_MODEL
+        self.use_contextual_rag = config.use_contextual_rag
+        self.enable_rag = config.enable_rag
 
         # Initialize ToM analyzer
         self.tom_analyzer = UserMentalStateAnalyzer(
-            processed_data_dir=processed_data_dir, model=self.llm_model
+            processed_data_dir=self.processed_data_dir, model=self.llm_model
         )
 
-        # RAG agent will be initialized when needed
+        # RAG agent will be initialized when needed (only if RAG is enabled)
         self._rag_agent: Optional[RAGAgent] = None
 
-        logger.info(f"ToM Agent initialized with model: {self.llm_model}")
+        rag_status = "enabled" if self.enable_rag else "disabled"
+        logger.info(f"ToM Agent initialized with model: {self.llm_model}, RAG: {rag_status}")
 
     async def _get_rag_agent(self) -> RAGAgent:
         """Get or initialize the RAG agent."""
@@ -148,38 +156,60 @@ class ToMAgent:
             mental_state_summary=mental_state_summary,
         )
 
-    async def _call_llm(
+    async def _call_llm_structured(
         self,
         prompt: str,
+        output_type: Any,
         temperature: float = 0.3,
         max_tokens: int = 1024,
-        response_format: Optional[Any] = None,
-    ) -> Optional[str]:
-        """Call the LLM with error handling."""
+    ) -> Optional[Any]:
+        """Call the LLM with structured output using new generation utilities."""
         if not LITELLM_API_KEY:
             logger.error("LLM API key not configured")
             return None
 
         try:
-            completion_args = {
-                "model": self.llm_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            }
+            config = LLMConfig(
+                model=self.llm_model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                api_key=LITELLM_API_KEY,
+                api_base=LITELLM_BASE_URL,
+            )
+            result = await call_llm_structured(
+                prompt=prompt,
+                output_type=output_type,
+                config=config,
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Error calling LLM with structured output: {e}")
+            return None
 
-            if response_format:
-                completion_args["response_format"] = response_format
+    async def _call_llm_simple(
+        self,
+        prompt: str,
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+    ) -> Optional[str]:
+        """Call the LLM for simple text generation."""
+        if not LITELLM_API_KEY:
+            logger.error("LLM API key not configured")
+            return None
 
-            if LITELLM_API_KEY:
-                completion_args["api_key"] = LITELLM_API_KEY
-            if LITELLM_BASE_URL:
-                completion_args["api_base"] = LITELLM_BASE_URL
-
-            response = await acompletion(**completion_args)
-            content: str = response.choices[0].message.content
-            return content.strip()
-
+        try:
+            config = LLMConfig(
+                model=self.llm_model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                api_key=LITELLM_API_KEY,
+                api_base=LITELLM_BASE_URL,
+            )
+            result = await call_llm_simple(
+                prompt=prompt,
+                config=config,
+            )
+            return result
         except Exception as e:
             logger.error(f"Error calling LLM: {e}")
             return None
@@ -203,17 +233,43 @@ class ToMAgent:
         """
         logger.info(f"Proposing instructions for user {user_context.user_id}")
 
-        # Get relevant user behavior from RAG
-        rag_agent = await self._get_rag_agent()
+        # Get relevant user behavior from RAG (if enabled)
+        relevant_behavior = ""
+        if self.enable_rag:
+            rag_start_time = time.time()
+            logger.info("⏱️  Starting RAG retrieval for instruction improvement...")
 
-        # Build context-aware query for RAG
-        rag_query = f"User preferences and behavior patterns related to: {original_instruction}"
-        if domain_context:
-            rag_query += f" in context of: {domain_context}"
+            rag_agent = await self._get_rag_agent()
+            rag_init_time = time.time()
+            logger.info(f"⏱️  RAG agent initialization: {rag_init_time - rag_start_time:.2f}s")
 
-        # Retrieve relevant user behavior
-        rag_results = await rag_agent.query(rag_query, k=5)
-        relevant_behavior = rag_results.get("response", "")
+            # Build context-aware query for RAG
+            rag_query = f"User preferences and behavior patterns related to: {original_instruction}"
+            if domain_context:
+                rag_query += f" in context of: {domain_context}"
+
+            # Retrieve relevant user behavior (retrieval only, no generation)
+            query_start_time = time.time()
+            retrieved_docs = rag_agent.retrieve(rag_query, k=5)
+            query_end_time = time.time()
+
+            # Extract content from retrieved documents
+            behavior_parts = []
+            for i, doc in enumerate(retrieved_docs[:3]):  # Use top 3 for context
+                behavior_parts.append(
+                    f"Context {i+1}: {doc.content[:500]}..."
+                )  # Truncate for efficiency
+
+            relevant_behavior = (
+                "\n\n".join(behavior_parts) if behavior_parts else "No relevant patterns found"
+            )
+
+            total_rag_time = query_end_time - rag_start_time
+            query_time = query_end_time - query_start_time
+            logger.info(f"⏱️  RAG query execution: {query_time:.2f}s")
+            logger.info(f"⏱️  Total RAG time for instructions: {total_rag_time:.2f}s")
+        else:
+            relevant_behavior = "RAG disabled - using user context only"
 
         # Build prompt for instruction improvement
         prompt = f"""
@@ -242,31 +298,43 @@ Please provide:
 4. Key personalization factors applied
 """
 
-        response = await self._call_llm(
+        # DEBUG: Check prompt length before LLM call
+        prompt_length = len(prompt)
+        logger.info("🔍 PROPOSE_INSTRUCTIONS DEBUG:")
+        logger.info(f"  - Prompt length: {prompt_length:,} characters")
+        logger.info(f"  - Estimated tokens: ~{prompt_length // 4:,} tokens")
+        logger.info(f"  - Relevant behavior length: {len(relevant_behavior):,} characters")
+        logger.info(f"  - User context sessions: {len(user_context.recent_sessions or [])}")
+
+        if prompt_length > 50000:  # If prompt is suspiciously large
+            logger.warning(f"⚠️  LARGE PROMPT DETECTED: {prompt_length:,} characters")
+            logger.info(
+                f"  - Mental state summary length: {len(user_context.mental_state_summary or ''):,}"
+            )
+            logger.info(f"  - Preferences count: {len(user_context.preferences or [])}")
+            logger.info(f"  - RAG behavior snippet: {relevant_behavior[:200]}...")
+
+            # Save full prompt to file for inspection
+            with open("/tmp/large_prompt_debug.txt", "w") as f:
+                f.write(prompt)
+            logger.info("  - Full prompt saved to /tmp/large_prompt_debug.txt")
+
+        result = await self._call_llm_structured(
             prompt,
+            output_type=InstructionImprovementResponse,
             temperature=0.2,
-            response_format={
-                "type": "json_object",
-                "schema": InstructionImprovementResponse.model_json_schema(),
-            },
         )
-        if not response:
+        if not result:
             return []
 
-        try:
-            result = InstructionImprovementResponse.model_validate_json(response)
-            return [
-                InstructionRecommendation(
-                    original_instruction=original_instruction,
-                    improved_instruction=result.improved_instruction,
-                    reasoning=result.reasoning,
-                    confidence_score=result.confidence_score,
-                    personalization_factors=result.personalization_factors,
-                )
-            ]
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.error(f"Error parsing instruction recommendation: {e}")
-            return []
+        return [
+            InstructionRecommendation(
+                original_instruction=original_instruction,
+                improved_instruction=result.improved_instruction,
+                reasoning=result.reasoning,
+                confidence_score=result.confidence_score,
+            )
+        ]
 
     async def suggest_next_actions(
         self, user_context: UserContext, current_task_context: Optional[str] = None
@@ -283,15 +351,41 @@ Please provide:
         """
         logger.info(f"Suggesting next actions for user {user_context.user_id}")
 
-        # Get relevant patterns from RAG
-        rag_agent = await self._get_rag_agent()
+        # Get relevant patterns from RAG (if enabled)
+        workflow_patterns = ""
+        if self.enable_rag:
+            rag_start_time = time.time()
+            logger.info("⏱️  Starting RAG retrieval for next actions...")
 
-        rag_query = "User workflow patterns and next action preferences"
-        if current_task_context:
-            rag_query += f" for tasks like: {current_task_context}"
+            rag_agent = await self._get_rag_agent()
+            rag_init_time = time.time()
+            logger.info(f"⏱️  RAG agent initialization: {rag_init_time - rag_start_time:.2f}s")
 
-        rag_results = await rag_agent.query(rag_query, k=3)
-        workflow_patterns = rag_results.get("response", "")
+            rag_query = "User workflow patterns and next action preferences"
+            if current_task_context:
+                rag_query += f" for tasks like: {current_task_context}"
+
+            query_start_time = time.time()
+            retrieved_docs = rag_agent.retrieve(rag_query, k=3)
+            query_end_time = time.time()
+
+            # Extract workflow patterns from retrieved documents
+            pattern_parts = []
+            for i, doc in enumerate(retrieved_docs[:3]):  # Use all 3 for workflow patterns
+                pattern_parts.append(
+                    f"Pattern {i+1}: {doc.content[:400]}..."
+                )  # Shorter for workflow patterns
+
+            workflow_patterns = (
+                "\n\n".join(pattern_parts) if pattern_parts else "No workflow patterns found"
+            )
+
+            total_rag_time = query_end_time - rag_start_time
+            query_time = query_end_time - query_start_time
+            logger.info(f"⏱️  RAG query execution: {query_time:.2f}s")
+            logger.info(f"⏱️  Total RAG time for next actions: {total_rag_time:.2f}s")
+        else:
+            workflow_patterns = "RAG disabled - using user context only"
 
         # Analyze recent session patterns
         recent_intents: List[str] = []
@@ -325,34 +419,47 @@ For each suggested action, provide:
 5. Alignment with user preferences (0-1 score)
 """
 
-        response = await self._call_llm(
-            prompt,
-            temperature=0.3,
-            response_format={
-                "type": "json_object",
-                "schema": NextActionsResponse.model_json_schema(),
-            },
+        # DEBUG: Check prompt length before LLM call
+        prompt_length = len(prompt)
+        logger.info("🔍 SUGGEST_NEXT_ACTIONS DEBUG:")
+        logger.info(f"  - Prompt length: {prompt_length:,} characters")
+        logger.info(f"  - Estimated tokens: ~{prompt_length // 4:,} tokens")
+        logger.info(f"  - Workflow patterns length: {len(workflow_patterns):,} characters")
+        logger.info(
+            f"  - Mental state summary length: {len(user_context.mental_state_summary or ''):,}"
         )
-        if not response:
+
+        if prompt_length > 50000:  # If prompt is suspiciously large
+            logger.warning(f"⚠️  LARGE PROMPT DETECTED: {prompt_length:,} characters")
+            logger.info(f"  - Recent intents: {len(recent_intents)}")
+            logger.info(f"  - Recent emotions: {len(recent_emotions)}")
+            logger.info(f"  - Workflow patterns snippet: {workflow_patterns[:200]}...")
+
+            # Save full prompt to file for inspection
+            with open("/tmp/large_prompt_next_actions_debug.txt", "w") as f:
+                f.write(prompt)
+            logger.info("  - Full prompt saved to /tmp/large_prompt_next_actions_debug.txt")
+
+        result = await self._call_llm_structured(
+            prompt,
+            output_type=NextActionsResponse,
+            temperature=0.3,
+        )
+        if not result:
             return []
 
-        try:
-            result = NextActionsResponse.model_validate_json(response)
-            suggestions = []
-            for llm_suggestion in result.suggestions:
-                suggestions.append(
-                    NextActionSuggestion(
-                        action_description=llm_suggestion.action_description,
-                        priority=llm_suggestion.priority,
-                        reasoning=llm_suggestion.reasoning,
-                        expected_outcome=llm_suggestion.expected_outcome,
-                        user_preference_alignment=llm_suggestion.user_preference_alignment,
-                    )
+        suggestions = []
+        for llm_suggestion in result.suggestions:
+            suggestions.append(
+                NextActionSuggestion(
+                    action_description=llm_suggestion.action_description,
+                    priority=llm_suggestion.priority,
+                    reasoning=llm_suggestion.reasoning,
+                    expected_outcome=llm_suggestion.expected_outcome,
+                    user_preference_alignment=llm_suggestion.user_preference_alignment,
                 )
-            return suggestions
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.error(f"Error parsing action suggestions: {e}")
-            return []
+            )
+        return suggestions
 
     async def get_personalized_guidance(
         self,
@@ -438,7 +545,7 @@ Provide a 2-3 sentence summary that:
 3. Provides encouragement aligned with their mental state
 """
 
-        response = await self._call_llm(prompt, temperature=0.4, max_tokens=150)
+        response = await self._call_llm_simple(prompt, temperature=0.4, max_tokens=150)
         return (
             response
             or "Based on your preferences and working style, I've provided personalized recommendations to help you work more effectively."
@@ -462,7 +569,11 @@ async def create_tom_agent(
     Returns:
         Initialized ToMAgent
     """
-    agent = ToMAgent(processed_data_dir=processed_data_dir, user_model_dir=user_model_dir, **kwargs)
+    agent = ToMAgent(
+        config=ToMAgentConfig(
+            processed_data_dir=processed_data_dir, user_model_dir=user_model_dir, **kwargs
+        )
+    )
     return agent
 
 
