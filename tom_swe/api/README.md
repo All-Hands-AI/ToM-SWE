@@ -1,14 +1,15 @@
 # ToM Agent REST API
 
-This directory contains the RESTful API implementation for the Theory of Mind (ToM) Agent. The API provides endpoints for interacting with the ToM agent's capabilities, including instruction improvement, next action suggestions, and comprehensive personalized guidance.
+This directory contains the RESTful API implementation for the Theory of Mind (ToM) Agent. The API provides endpoints for personalized instruction improvement and next action suggestions for SWE agents.
 
 ## Features
 
-The API provides three main endpoints as requested in issue #17:
+The API v2.0.0 provides these main endpoints:
 
-1. **`/api/v1/suggest_next_actions`** - API for using the `suggest_next_actions` functionality
-2. **`/api/v1/propose_instructions`** - API for using the `propose_instructions` functionality  
-3. **`/api/v1/send_message`** - API for sending messages to the ToM agent and getting comprehensive guidance
+1. **`POST /propose_instructions`** - Get improved, personalized instructions
+2. **`POST /suggest_next_actions`** - Get personalized next action suggestions
+3. **`GET /health`** - Health check endpoint
+4. **`GET /conversation_status`** - Get conversation status for a user
 
 ## Quick Start
 
@@ -18,7 +19,7 @@ The API dependencies are included in the main project dependencies. Make sure yo
 
 ```bash
 # Install the project with API dependencies
-pip install -e .
+uv sync --extra dev
 ```
 
 ### Running the Server
@@ -43,8 +44,9 @@ The API server can be configured using command-line arguments or environment var
 - `--host` / `API_HOST`: Host to bind the server to (default: 0.0.0.0)
 - `--port` / `API_PORT`: Port to bind the server to (default: 8000)
 - `--reload` / `API_RELOAD`: Enable auto-reload for development (default: false)
-- `--processed-data-dir` / `TOM_PROCESSED_DATA_DIR`: Directory containing processed user data
-- `--user-model-dir` / `TOM_USER_MODEL_DIR`: Directory containing user model data
+- `TOM_PROCESSED_DATA_DIR`: Directory containing processed user data (default: ./data/processed_data)
+- `TOM_USER_MODEL_DIR`: Directory containing user model data (default: ./data/user_model)
+- `TOM_ENABLE_RAG`: Enable RAG functionality (default: true)
 
 ## API Endpoints
 
@@ -58,22 +60,57 @@ Check the health status of the API server and ToM agent.
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
-  "tom_agent_ready": true
+  "version": "2.0.0",
+  "tom_agent_ready": true,
+  "active_conversations": 3
 }
 ```
 
-### Suggest Next Actions
+### Propose Instructions
 
-**POST** `/api/v1/suggest_next_actions`
+**POST** `/propose_instructions`
 
-Get personalized next action suggestions for a user based on their context and current task.
+Get improved, personalized instructions based on user context and preferences.
 
 **Request:**
 ```json
 {
   "user_id": "user_123",
-  "current_task_context": "Debugging Python application"
+  "original_instruction": "Debug the function that's causing errors",
+  "context": "User message: I need help debugging my Python application. Previous conversation includes discussion about web development and systematic debugging approaches."
+}
+```
+
+**Response:**
+```json
+{
+  "user_id": "user_123",
+  "original_instruction": "Debug the function that's causing errors",
+  "recommendations": [
+    {
+      "original_instruction": "Debug the function that's causing errors",
+      "improved_instruction": "Debug the function by systematically adding logging statements and checking each variable step-by-step",
+      "reasoning": "Personalized for user's preference for detailed, systematic approaches",
+      "confidence_score": 0.85,
+      "personalization_factors": ["detailed_explanations", "systematic_approach"]
+    }
+  ],
+  "success": true,
+  "message": "Generated 1 instruction recommendations"
+}
+```
+
+### Suggest Next Actions
+
+**POST** `/suggest_next_actions`
+
+Get personalized next action suggestions based on user context and current situation.
+
+**Request:**
+```json
+{
+  "user_id": "user_123",
+  "context": "Agent response: I've identified the error in the login function. The issue is with the password validation logic. Previous interactions show user prefers step-by-step debugging."
 }
 ```
 
@@ -91,99 +128,23 @@ Get personalized next action suggestions for a user based on their context and c
     }
   ],
   "success": true,
-  "message": "Generated 2 action suggestions"
+  "message": "Generated 1 next action suggestions"
 }
 ```
 
-### Propose Instructions
+### Get Conversation Status
 
-**POST** `/api/v1/propose_instructions`
+**GET** `/conversation_status?user_id=user_123`
 
-Get improved, personalized instructions based on user context and preferences.
-
-**Request:**
-```json
-{
-  "user_id": "user_123",
-  "original_instruction": "Debug the function that's causing errors",
-  "domain_context": "Python web development"
-}
-```
+Get the current conversation status for a user.
 
 **Response:**
 ```json
 {
   "user_id": "user_123",
-  "recommendations": [
-    {
-      "original_instruction": "Debug the function that's causing errors",
-      "improved_instruction": "Debug the function by systematically adding logging statements and checking each variable step-by-step",
-      "reasoning": "Personalized for user's preference for detailed, systematic approaches",
-      "confidence_score": 0.85,
-      "personalization_factors": ["detailed_explanations", "systematic_approach"]
-    }
-  ],
-  "success": true,
-  "message": "Generated 1 instruction recommendations"
-}
-```
-
-### Send Message
-
-**POST** `/api/v1/send_message`
-
-Send a message to the ToM agent and get comprehensive personalized guidance.
-
-**Request:**
-```json
-{
-  "user_id": "user_123",
-  "message": "I need help debugging my Python application",
-  "instruction": "Debug the function that's causing errors",
-  "current_task": "Debugging Python web application",
-  "domain_context": "Web development"
-}
-```
-
-**Response:**
-```json
-{
-  "user_id": "user_123",
-  "guidance": {
-    "user_context": {
-      "user_id": "user_123",
-      "user_profile": { ... },
-      "recent_sessions": [ ... ],
-      "preferences": ["detailed_explanations", "step_by_step_help"],
-      "mental_state_summary": "A focused developer who prefers detailed guidance"
-    },
-    "instruction_recommendations": [ ... ],
-    "next_action_suggestions": [ ... ],
-    "overall_guidance": "Based on your systematic approach, I've provided detailed debugging steps and next actions.",
-    "confidence_score": 0.85
-  },
-  "success": true,
-  "message": "Generated personalized guidance successfully"
-}
-```
-
-### Get User Context
-
-**GET** `/api/v1/users/{user_id}/context`
-
-Get the current context for a specific user.
-
-**Response:**
-```json
-{
-  "user_id": "user_123",
-  "context": {
-    "user_id": "user_123",
-    "user_profile": { ... },
-    "recent_sessions": [ ... ],
-    "preferences": [ ... ],
-    "mental_state_summary": "..."
-  },
+  "has_pending_instructions": true,
+  "has_pending_next_actions": false,
+  "last_activity": "2023-10-20T14:30:00Z",
   "success": true
 }
 ```
@@ -230,6 +191,27 @@ tom-api --reload --log-level debug
 
 The API includes CORS middleware configured to allow all origins for development. For production, update the `allow_origins` setting in `main.py`.
 
+### Debug Endpoints
+
+Additional endpoints for debugging and monitoring:
+
+- **GET** `/active_conversations` - Get information about all active conversations
+- **DELETE** `/conversation/{user_id}` - Clear conversation state for a specific user
+
+## Usage Flow
+
+The API supports two main use cases:
+
+### Instruction Improvement Flow
+1. **SWE Agent** calls `POST /propose_instructions` with user message and original instruction
+2. **ToM Agent** analyzes user context and generates improved instructions
+3. **SWE Agent** receives personalized instruction recommendations
+
+### Next Action Suggestions Flow
+1. **SWE Agent** calls `POST /suggest_next_actions` with current conversation context
+2. **ToM Agent** analyzes user behavior patterns and generates next action suggestions
+3. **SWE Agent** receives personalized action recommendations
+
 ## Architecture
 
 The API is built using:
@@ -237,6 +219,15 @@ The API is built using:
 - **Pydantic**: Data validation and serialization
 - **Uvicorn**: ASGI server for running the application
 - **AsyncIO**: Asynchronous programming for better performance
+
+### Key Components
+
+- **Direct Processing**: Each endpoint handles its specific functionality
+- **User Context Analysis**: Analyzes user behavior patterns and preferences
+- **Async Processing**: Non-blocking ToM agent operations
+- **Error Handling**: Comprehensive error handling and logging
+
+### Integration
 
 The API integrates with the existing ToM agent infrastructure:
 - `ToMAgent`: Main agent class for personalized guidance

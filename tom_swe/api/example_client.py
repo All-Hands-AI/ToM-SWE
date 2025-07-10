@@ -2,12 +2,12 @@
 """
 Example client for the ToM Agent REST API.
 
-This script demonstrates how to interact with the redesigned ToM Agent API
-endpoints with the new bidirectional communication flow.
+This script demonstrates how to interact with the ToM Agent API
+endpoints for instruction improvement and next action suggestions.
 """
 
 import asyncio
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, cast
 
 import httpx
 
@@ -30,39 +30,33 @@ class ToMAgentClient:
         response.raise_for_status()
         return cast(Dict[str, Any], response.json())
 
-    async def send_message(
+    async def propose_instructions(
         self,
         user_id: str,
-        message: str,
-        message_type: str,
-        context: Optional[Dict[str, str]] = None,
+        original_instruction: str,
+        context: str,
     ) -> Dict[str, Any]:
-        """Send a message to the ToM agent (new API)."""
+        """Get improved, personalized instructions."""
         data = {
             "user_id": user_id,
-            "message": message,
-            "message_type": message_type,
+            "original_instruction": original_instruction,
+            "context": context,
         }
-        if context:
-            data.update(context)
-
-        response = await self.client.post(f"{self.base_url}/send_msg", json=data)
+        response = await self.client.post(f"{self.base_url}/propose_instructions", json=data)
         response.raise_for_status()
         return cast(Dict[str, Any], response.json())
 
-    async def get_propose_instructions(self, user_id: str) -> Dict[str, Any]:
-        """Get cached instruction improvements for a user (new API)."""
-        response = await self.client.get(
-            f"{self.base_url}/propose_instructions", params={"user_id": user_id}
-        )
-        response.raise_for_status()
-        return cast(Dict[str, Any], response.json())
-
-    async def get_suggest_next_actions(self, user_id: str) -> Dict[str, Any]:
-        """Get cached next action suggestions for a user (new API)."""
-        response = await self.client.get(
-            f"{self.base_url}/suggest_next_actions", params={"user_id": user_id}
-        )
+    async def suggest_next_actions(
+        self,
+        user_id: str,
+        context: str,
+    ) -> Dict[str, Any]:
+        """Get personalized next action suggestions."""
+        data = {
+            "user_id": user_id,
+            "context": context,
+        }
+        response = await self.client.post(f"{self.base_url}/suggest_next_actions", json=data)
         response.raise_for_status()
         return cast(Dict[str, Any], response.json())
 
@@ -71,12 +65,6 @@ class ToMAgentClient:
         response = await self.client.get(
             f"{self.base_url}/conversation_status", params={"user_id": user_id}
         )
-        response.raise_for_status()
-        return cast(Dict[str, Any], response.json())
-
-    async def get_active_conversations(self) -> Dict[str, Any]:
-        """Get information about all active conversations."""
-        response = await self.client.get(f"{self.base_url}/active_conversations")
         response.raise_for_status()
         return cast(Dict[str, Any], response.json())
 
@@ -89,11 +77,6 @@ async def check_api_health(client: ToMAgentClient) -> None:
     print(f"📊 ToM Agent Ready: {health['tom_agent_ready']}")
     print(f"🆔 API Version: {health.get('version', 'unknown')}")
 
-    # Handle both old and new API versions
-    if "active_conversations" in health:
-        print(f"🗣️  Active Conversations: {health['active_conversations']}")
-    else:
-        print("🗣️  Active Conversations: Not supported in this API version")
     print()
 
 
@@ -103,122 +86,77 @@ async def check_conversation_status(client: ToMAgentClient, user_id: str) -> Non
     try:
         status = await client.get_conversation_status(user_id)
         print("✅ Conversation status retrieved:")
-        print(f"📝 Has pending instructions: {status['has_pending_instructions']}")
-        print(f"🎯 Has pending next actions: {status['has_pending_next_actions']}")
-        if status.get("last_activity"):
-            print(f"⏱️  Last activity: {status['last_activity']}")
+        print(f"💬 Message: {status['message']}")
     except httpx.HTTPStatusError as e:
         print(f"⚠️  Status check failed: {e.response.status_code}")
     print()
 
 
-async def send_user_message(client: ToMAgentClient, user_id: str) -> None:
-    """Send a user message and handle response."""
-    print("📤 Step 1: Sending user message...")
+async def get_improved_instructions(client: ToMAgentClient, user_id: str) -> None:
+    """Get improved instructions for a user task."""
+    print("📝 Step 1: Getting improved instructions...")
     try:
-        context = {
-            "original_instruction": "Debug the function that's causing errors",
-            "task_context": "Debugging Python application",
-            "domain_context": "Python web development",
-        }
-        send_response = await client.send_message(
+        context = "User message: I need help debugging this Python function that keeps throwing IndexError. Previous conversation includes discussion about web development and systematic debugging approaches."
+
+        instructions_response = await client.propose_instructions(
             user_id=user_id,
-            message="I need help debugging this Python function that keeps throwing IndexError",
-            message_type="user_message",
+            original_instruction="Debug the function that's causing errors",
             context=context,
         )
-        print("✅ User message sent successfully:")
-        print(f"📋 Processing type: {send_response['processing_type']}")
-        print(f"💬 Message: {send_response['message']}")
-        print(f"⏰ Timestamp: {send_response['timestamp']}")
+
+        if instructions_response["success"]:
+            print("✅ Improved instructions received:")
+            print(f"📋 Original: {instructions_response['original_instruction']}")
+
+            for i, rec in enumerate(instructions_response["recommendations"], 1):
+                print(f"  {i}. Improved: {rec['improved_instruction']}")
+                print(f"     Confidence: {rec['confidence_score']:.2f}")
+                print(f"     Reasoning: {rec['reasoning']}")
+        else:
+            print(f"⚠️  {instructions_response['message']}")
     except httpx.HTTPStatusError as e:
-        print(f"❌ Failed to send user message: {e.response.status_code}")
+        print(f"❌ Failed to get improved instructions: {e.response.status_code}")
         print(f"   Response: {e.response.text}")
     print()
 
 
-async def retrieve_instructions(client: ToMAgentClient, user_id: str) -> None:
-    """Retrieve and display improved instructions."""
-    print("📥 Step 2: Retrieving improved instructions...")
+async def get_next_actions(client: ToMAgentClient, user_id: str) -> None:
+    """Get next action suggestions for a user."""
+    print("🎯 Step 2: Getting next action suggestions...")
     try:
-        instructions = await client.get_propose_instructions(user_id)
-        if instructions["success"]:
-            print(f"✅ Got {len(instructions['recommendations'])} instruction recommendations:")
-            for i, rec in enumerate(instructions["recommendations"], 1):
-                print(f"  {i}. Original: {rec['original_instruction']}")
-                print(f"     Improved: {rec['improved_instruction']}")
-                print(f"     Confidence: {rec['confidence_score']:.2f}")
-                print(f"     Reasoning: {rec['reasoning']}")
-            print(f"⏰ Calculated at: {instructions['calculated_at']}")
-        else:
-            print(f"⚠️  {instructions['message']}")
-    except httpx.HTTPStatusError as e:
-        print(f"❌ Failed to get instructions: {e.response.status_code}")
-    print()
+        context = "Agent response: I've analyzed the IndexError. The issue is likely with list bounds checking in your function. I've identified 3 potential locations where this could occur. Previous interactions show user prefers step-by-step debugging."
 
-
-async def send_agent_response(client: ToMAgentClient, user_id: str) -> None:
-    """Send an agent response message."""
-    print("📤 Step 3: Sending agent response...")
-    try:
-        context = {"task_context": "Debugging IndexError in Python function"}
-        agent_response = await client.send_message(
+        actions_response = await client.suggest_next_actions(
             user_id=user_id,
-            message="I've analyzed the IndexError. The issue is likely with list bounds checking in your function. I've identified 3 potential locations where this could occur.",
-            message_type="agent_response",
             context=context,
         )
-        print("✅ Agent response sent successfully:")
-        print(f"📋 Processing type: {agent_response['processing_type']}")
-        print(f"💬 Message: {agent_response['message']}")
-    except httpx.HTTPStatusError as e:
-        print(f"❌ Failed to send agent response: {e.response.status_code}")
-    print()
 
-
-async def retrieve_next_actions(client: ToMAgentClient, user_id: str) -> None:
-    """Retrieve and display next action suggestions."""
-    print("📥 Step 4: Retrieving next action suggestions...")
-    try:
-        actions = await client.get_suggest_next_actions(user_id)
-        if actions["success"]:
-            print(f"✅ Got {len(actions['suggestions'])} action suggestions:")
-            for i, suggestion in enumerate(actions["suggestions"], 1):
+        if actions_response["success"]:
+            print(f"✅ Got {len(actions_response['suggestions'])} action suggestions:")
+            for i, suggestion in enumerate(actions_response["suggestions"], 1):
                 print(
                     f"  {i}. [{suggestion['priority'].upper()}] {suggestion['action_description']}"
                 )
                 print(f"     Expected: {suggestion['expected_outcome']}")
                 print(f"     Alignment: {suggestion['user_preference_alignment']:.2f}")
-            print(f"📊 Based on: {actions['based_on_context']}")
-            print(f"⏰ Calculated at: {actions['calculated_at']}")
+                print(f"     Reasoning: {suggestion['reasoning']}")
         else:
-            print(f"⚠️  {actions['message']}")
+            print(f"⚠️  {actions_response['message']}")
     except httpx.HTTPStatusError as e:
         print(f"❌ Failed to get next actions: {e.response.status_code}")
     print()
 
 
 async def show_final_status(client: ToMAgentClient, user_id: str) -> None:
-    """Show final conversation status and active conversations."""
+    """Show final conversation status."""
     print("🔍 Final conversation status check...")
     try:
         final_status = await client.get_conversation_status(user_id)
         print("✅ Final status:")
-        print(f"📝 Has pending instructions: {final_status['has_pending_instructions']}")
-        print(f"🎯 Has pending next actions: {final_status['has_pending_next_actions']}")
-        print(f"⏱️  Last activity: {final_status['last_activity']}")
+        print(f"💬 Message: {final_status['message']}")
     except httpx.HTTPStatusError as e:
         print(f"⚠️  Final status check failed: {e.response.status_code}")
     print()
-
-    print("🗣️  Checking active conversations...")
-    try:
-        conversations = await client.get_active_conversations()
-        print(f"✅ Total active conversations: {conversations['total_conversations']}")
-        if conversations["user_ids"]:
-            print(f"👥 User IDs: {', '.join(conversations['user_ids'])}")
-    except httpx.HTTPStatusError as e:
-        print(f"⚠️  Could not get active conversations: {e.response.status_code}")
 
 
 async def main() -> None:
@@ -233,14 +171,12 @@ async def main() -> None:
 
         await check_conversation_status(client, user_id)
 
-        # Simulate the new bidirectional flow
-        print("🔄 Testing new bidirectional communication flow...")
+        # Test the direct API endpoints
+        print("🔄 Testing ToM Agent API endpoints...")
         print()
 
-        await send_user_message(client, user_id)
-        await retrieve_instructions(client, user_id)
-        await send_agent_response(client, user_id)
-        await retrieve_next_actions(client, user_id)
+        await get_improved_instructions(client, user_id)
+        await get_next_actions(client, user_id)
         await show_final_status(client, user_id)
 
     except httpx.ConnectError:
