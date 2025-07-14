@@ -27,7 +27,7 @@ import litellm
 from dotenv import load_dotenv
 
 # Local imports
-from .database import (
+from tom_swe.database import (
     InstructionImprovementResponse,
     InstructionRecommendation,
     NextActionsResponse,
@@ -35,9 +35,9 @@ from .database import (
     PersonalizedGuidance,
     UserContext,
 )
-from .generation_utils.generate import LLMConfig, call_llm_simple, call_llm_structured
-from .rag_module import RAGAgent, create_rag_agent
-from .tom_module import UserMentalStateAnalyzer
+from tom_swe.generation_utils.generate import LLMConfig, call_llm_simple, call_llm_structured
+from tom_swe.rag_module import RAGAgent, create_rag_agent
+from tom_swe.tom_module import UserMentalStateAnalyzer
 
 # Load environment variables
 load_dotenv()
@@ -243,7 +243,7 @@ class ToMAgent:
         relevant_behavior = await self._get_relevant_behavior(original_instruction)
 
         # Build prompt for instruction improvement
-        prompt = self._build_instruction_prompt(
+        prompt = self._build_better_instruction_prompt(
             user_context, original_instruction, relevant_behavior, user_msg_context
         )
 
@@ -305,16 +305,14 @@ class ToMAgent:
 (ToM agent reasoning is not from the actual user, but aims to help you better understand the user's intent)
 The clarity score of the original message was: {scores.clarity_score*100:.0f}%, (here's the reasoning: {reasoning}).
 
-Based on the conversation context and user patterns, here's a clearer interpretation of what the user likely means:
+Based on the conversation context and user patterns, here's a suggestion to help you better understand and help the user:
 
-## Improved Instruction
+## Action Suggestions (IMPORTANT!)
 {improved_instruction}
 
-## Confidence in interpretation
-Confidence in interpretation: {scores.confidence_score*100:.0f}%
-
-## YOU MUST FOLLOW THIS INSTRUCTION
-**IMPORTANT** (you HAVE to follow this instruction): First show user the improved instruction (just copy the improved instruction section above) and ask if they would like to continue with the plan (e.g., 'Would you like to continue with the plan? Or do you have any other plans in mind?'). And offer to explore the current environment a bit more first (e.g., 'Would you like to explore the current environment a bit more first?')"""
+## Confidence in the suggestions
+The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions.
+"""
 
         return final_instruction
 
@@ -361,16 +359,10 @@ Confidence in interpretation: {scores.confidence_score*100:.0f}%
             if metadata.get("repository_context"):
                 context_parts.append(f"Project: {metadata['repository_context']}")
 
-            # Add surrounding context
-            surrounding = metadata.get("surrounding_context", {})
-            if surrounding.get("prev_agent_msg"):
-                context_parts.append(f"Previous agent: {surrounding['prev_agent_msg']}")
-            if surrounding.get("next_agent_msg"):
-                context_parts.append(f"Next agent: {surrounding['next_agent_msg']}")
-            if surrounding.get("prev_user_msg"):
-                context_parts.append(f"Previous user: {surrounding['prev_user_msg']}")
-            if surrounding.get("next_user_msg"):
-                context_parts.append(f"Next user: {surrounding['next_user_msg']}")
+            # Add surrounding context (now a string)
+            surrounding = metadata.get("surrounding_context", "")
+            if surrounding:
+                context_parts.append(f"Context: {surrounding}")
 
             behavior_parts.append(f"Context {i+1}:\n" + "\n".join(context_parts))
 
@@ -385,7 +377,7 @@ Confidence in interpretation: {scores.confidence_score*100:.0f}%
 
         return relevant_behavior
 
-    def _build_instruction_prompt(
+    def _build_better_instruction_prompt(
         self,
         user_context: UserContext,
         original_instruction: str,
@@ -394,7 +386,7 @@ Confidence in interpretation: {scores.confidence_score*100:.0f}%
     ) -> str:
         """Build the prompt for instruction improvement."""
         return f"""
-Based on the following user context and behavior patterns, propose a plan to help the user achieve their goal (use markdown bullet points format).
+Based on the following user context and behavior patterns, propose a plan to help the user achieve their goal.
 
 User Context:
 - User ID: {user_context.user_id}
@@ -402,7 +394,7 @@ User Context:
 - Preferences: {', '.join(user_context.preferences or [])}
 - Recent Session Count: {len(user_context.recent_sessions or [])}
 
-Relevant User Behavior Patterns:
+Relevant Past User Interaction Contexts:
 {relevant_behavior}
 
 Original Instruction:
@@ -411,7 +403,7 @@ Original Instruction:
 Context (interactions happening before the original instruction, if any):
 {user_msg_context}
 
-Please generate the plan that you think the user was actually trying to achieve (following the format below).
+Please generate suggestions to help the agent better understand and help the user (following the format below).
 """
 
     def _debug_large_prompt(
@@ -681,32 +673,33 @@ if __name__ == "__main__":
         # Create ToM agent
         agent = await create_tom_agent()
 
-        # Example usage
-        user_id = "example_user_123"
-        instruction = "Debug the function that's causing errors"
+        # Test user and instruction
+        user_id = "20d03f52-abb6-4414-b024-67cc89d53e12"
+        instruction = "Hi hiiiiiii"
 
-        # Get personalized guidance
-        guidance = await agent.get_personalized_guidance(
-            user_id=user_id,
-            instruction=instruction,
-            current_task="Debugging Python application",
-            user_msg_context="Web development",
+        print(f"Testing ToM Agent with user: {user_id}")
+        print(f"Original instruction: '{instruction}'")
+        print("=" * 60)
+
+        # Test propose_instructions specifically
+        print("\n1. Testing propose_instructions...")
+        user_context = await agent.analyze_user_context(user_id, instruction)
+        print(
+            f"✓ User context analyzed - Mental state: {user_context.mental_state_summary[:100] if user_context.mental_state_summary else 'No mental state found'}..."
         )
 
-        print(f"Personalized guidance for user {user_id}:")
-        print(f"Overall guidance: {guidance.overall_guidance}")
-        print(f"Confidence score: {guidance.confidence_score:.2f}")
+        instruction_recommendations = await agent.propose_instructions(
+            user_context, instruction, user_msg_context=""
+        )
 
-        if guidance.instruction_recommendations:
-            print("\nInstruction improvements:")
-            for rec in guidance.instruction_recommendations:
-                print(f"- {rec.improved_instruction}")
-                print(f"  Reasoning: {rec.reasoning}")
+        print(f"✓ Generated {len(instruction_recommendations)} instruction recommendations")
 
-        if guidance.next_action_suggestions:
-            print("\nNext action suggestions:")
-            for sug in guidance.next_action_suggestions:
-                print(f"- [{sug.priority.upper()}] {sug.action_description}")
-                print(f"  Expected outcome: {sug.expected_outcome}")
+        if instruction_recommendations:
+            print("\nInstruction Improvements:")
+            for i, rec in enumerate(instruction_recommendations, 1):
+                print(f"\n--- Recommendation {i} ---")
+                print(f"Improved instruction:\n{rec.improved_instruction}")
+        else:
+            print("❌ No instruction recommendations generated")
 
     asyncio.run(main())

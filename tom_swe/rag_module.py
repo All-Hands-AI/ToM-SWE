@@ -346,49 +346,10 @@ class VectorDB:
                             session_content, config, doc.doc_id, session_id
                         )
                         all_chunks.extend(chunks)
-                    else:
-                        # Fallback: treat as single chunk if structure is unexpected
-                        content = json.dumps(session_content, indent=2)
-                        if self._count_tokens(content) <= config.max_chunk_tokens:
-                            all_chunks.append(
-                                {
-                                    "content": content,
-                                    "metadata": {
-                                        "doc_id": doc.doc_id,
-                                        "session_id": session_id,
-                                        "chunk_id": f"{doc.doc_id}_{session_id}_fallback",
-                                        "chunk_type": "fallback",
-                                        "token_count": self._count_tokens(content),
-                                        "doc_metadata": doc.metadata or {},
-                                        # Store content in metadata for retrieval
-                                        "content": content,
-                                    },
-                                }
-                            )
 
             except (json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"Could not parse document {doc.doc_id} for chunking: {e}")
-                # Fallback to original chunking for malformed data
-                for chunk in doc.chunks:
-                    content = chunk["content"]
-                    if self._count_tokens(content) <= config.max_chunk_tokens:
-                        all_chunks.append(
-                            {
-                                "content": content,
-                                "metadata": {
-                                    "doc_id": doc.doc_id,
-                                    "chunk_id": chunk.get(
-                                        "chunk_id", f"{doc.doc_id}_{len(all_chunks)}"
-                                    ),
-                                    "chunk_type": "legacy",
-                                    "token_count": self._count_tokens(content),
-                                    "doc_metadata": doc.metadata or {},
-                                    "chunk_metadata": chunk,
-                                    # Store content in metadata for retrieval
-                                    "content": content,
-                                },
-                            }
-                        )
+                continue
 
         logger.info(f"Created {len(all_chunks)} optimized chunks from {len(documents)} documents")
         return all_chunks
@@ -439,9 +400,7 @@ class VectorDB:
                 surrounding_context = self._extract_surrounding_context(events, i, config)
 
                 # Calculate total tokens (user message + context)
-                context_tokens = sum(
-                    self._count_tokens(msg) for msg in surrounding_context.values()
-                )
+                context_tokens = self._count_tokens(surrounding_context)
                 user_msg_tokens = self._count_tokens(cleaned_content)
                 total_tokens = user_msg_tokens + context_tokens
 
@@ -453,25 +412,38 @@ class VectorDB:
                     # logger.debug(f"Condensed user message from {user_msg_tokens} to {self._count_tokens(final_user_content)} tokens")
                     continue  # we give up on this chunk
 
+                # Load detailed session metadata from user_model_detailed folder
+                detailed_metadata = self._load_session_metadata(doc_id, session_id)
+
+                # Create chunk ID
+                chunk_id = f"{doc_id}_{session_id}_msg_{i}"
+
+                # Create condensed "all_one_need" field
+                all_one_need = self._create_all_one_need_string(
+                    final_user_content, detailed_metadata, surrounding_context, chunk_id
+                )
+
                 chunks.append(
                     {
                         "content": final_user_content,
                         "metadata": {
                             "doc_id": doc_id,
                             "session_id": session_id,
-                            "chunk_id": f"{doc_id}_{session_id}_msg_{i}",
+                            "chunk_id": chunk_id,
                             "chunk_type": "user_message",
                             "message_index": i,
                             "token_count": self._count_tokens(final_user_content),
-                            # Basic session info
-                            "session_title": session.get("metadata", {}).get("title", ""),
-                            "repository_context": session.get("metadata", {}).get(
-                                "selected_repository", ""
-                            ),
+                            # Rich session info from detailed metadata
+                            "session_title": detailed_metadata.get("title", ""),
+                            "repository_context": detailed_metadata.get("selected_repository", ""),
+                            "selected_branch": detailed_metadata.get("selected_branch", ""),
+                            "trigger": detailed_metadata.get("trigger", ""),
                             # Enhanced context
                             "surrounding_context": surrounding_context,
                             # Store content in metadata for retrieval
                             "content": final_user_content,
+                            # Condensed everything in one field
+                            "all_one_need": all_one_need,
                         },
                     }
                 )
@@ -513,11 +485,77 @@ class VectorDB:
 
         return cleaned
 
+    def _load_session_metadata(self, user_id: str, session_id: str) -> Dict[str, Any]:
+        """
+        Load detailed session metadata from user_model_detailed folder.
+
+        Args:
+            user_id: User ID
+            session_id: Session ID
+
+        Returns:
+            Session metadata dictionary
+        """
+        metadata_path = Path(f"data/user_model/user_model_detailed/{user_id}/{session_id}.json")
+
+        if metadata_path.exists():
+            try:
+                with open(metadata_path, encoding="utf-8") as f:
+                    session_data = json.load(f)
+                metadata = session_data.get("metadata", {})
+                return dict(metadata) if metadata else {}
+            except Exception as e:
+                logger.warning(f"Failed to load session metadata for {session_id}: {e}")
+
+        return {}
+
+    def _create_all_one_need_string(
+        self, user_content: str, metadata: Dict[str, Any], surrounding_context: str, chunk_id: str
+    ) -> str:
+        """
+        Create a comprehensive markdown-formatted string with all important information.
+
+        Args:
+            user_content: The user's message content
+            metadata: Session metadata
+            surrounding_context: Surrounding conversation context
+            chunk_id: The chunk identifier
+
+        Returns:
+            Markdown-formatted string with all relevant info
+        """
+        lines = []
+
+        # Header with chunk identification
+        lines.append("## User Message")
+        lines.append(user_content)
+
+        # Surrounding context if available
+        if surrounding_context:
+            lines.append("")
+            lines.append("### Context")
+            lines.append(surrounding_context)
+
+        # Metadata
+        lines.append("")
+        lines.append("### Metadata")
+        lines.append(f"**Chunk ID**: `{chunk_id}`")
+        if metadata.get("title"):
+            lines.append(f"**Session**: {metadata['title']}")
+        if metadata.get("selected_repository"):
+            lines.append(f"**Repository**: {metadata['selected_repository']}")
+        if metadata.get("selected_branch"):
+            lines.append(f"**Branch**: {metadata['selected_branch']}")
+        if metadata.get("trigger"):
+            lines.append(f"**Trigger**: {metadata['trigger']}")
+
+        return "\n".join(lines)
+
     def _extract_surrounding_context(
         self, events: List[Dict[str, Any]], user_msg_index: int, config: ChunkingConfig
-    ) -> Dict[str, Any]:
+    ) -> str:
         """
-        Extract surrounding context: prev_agent_msg, next_agent_msg, prev_user_msg, next_user_msg.
+        Extract surrounding context as a condensed string.
 
         Args:
             events: List of conversation events
@@ -525,34 +563,23 @@ class VectorDB:
             config: Chunking configuration for token limits
 
         Returns:
-            Dictionary containing surrounding context messages
+            String containing surrounding context
         """
-        context = {}
+        context_parts = []
         # Use 1/5 of target chunk tokens for each context message
-        context_token_limit = config.target_chunk_tokens // 5
-        context["next_agent_msg"] = ""
-        context["prev_agent_msg"] = ""
-        context["next_user_msg"] = ""
-        context["prev_user_msg"] = ""
+        context_token_limit = (
+            config.target_chunk_tokens // 10
+        )  # Smaller limit since we're combining
 
         # Find previous agent message
         for i in range(user_msg_index - 1, -1, -1):
             if events[i].get("source") == "assistant":
                 content = events[i].get("content", "")
                 if content.strip():
-                    context["prev_agent_msg"] = self._condense_if_needed(
+                    condensed = self._condense_if_needed(
                         content, context_token_limit, "prev_agent_msg"
                     )
-                break
-
-        # Find next agent message
-        for i in range(user_msg_index + 1, len(events)):
-            if events[i].get("source") == "assistant":
-                content = events[i].get("content", "")
-                if content.strip():
-                    context["next_agent_msg"] = self._condense_if_needed(
-                        content, context_token_limit, "next_agent_msg"
-                    )
+                    context_parts.append(f"PREV_AGENT: {condensed}")
                 break
 
         # Find previous user message
@@ -561,9 +588,10 @@ class VectorDB:
                 content = events[i].get("content", "")
                 cleaned_content = self._clean_user_message(content)
                 if cleaned_content.strip():
-                    context["prev_user_msg"] = self._condense_if_needed(
+                    condensed = self._condense_if_needed(
                         cleaned_content, context_token_limit, "prev_user_msg"
                     )
+                    context_parts.append(f"PREV_USER: {condensed}")
                     break
 
         # Find next user message
@@ -572,12 +600,24 @@ class VectorDB:
                 content = events[i].get("content", "")
                 cleaned_content = self._clean_user_message(content)
                 if cleaned_content.strip():
-                    context["next_user_msg"] = self._condense_if_needed(
+                    condensed = self._condense_if_needed(
                         cleaned_content, context_token_limit, "next_user_msg"
                     )
+                    context_parts.append(f"NEXT_USER: {condensed}")
                     break
 
-        return context
+        # Find next agent message
+        for i in range(user_msg_index + 1, len(events)):
+            if events[i].get("source") == "assistant":
+                content = events[i].get("content", "")
+                if content.strip():
+                    condensed = self._condense_if_needed(
+                        content, context_token_limit, "next_agent_msg"
+                    )
+                    context_parts.append(f"NEXT_AGENT: {condensed}")
+                break
+
+        return " | ".join(context_parts) if context_parts else ""
 
     def _condense_if_needed(
         self, content: str, max_tokens: int, content_type: str = "message"
@@ -866,23 +906,10 @@ if __name__ == "__main__":
         for i, result in enumerate(results[:3]):  # Show top 3
             print(f"{i+1}. Score: {result.similarity:.3f}")
             print(f"   Content: {result.content}")
-            print(f"   Session: {result.metadata.get('session_title', 'N/A')}")
-            print(f"   Repository: {result.metadata.get('repository_context', 'N/A')}")
-            print(f"   Chunk Type: {result.metadata.get('chunk_type', 'N/A')}")
-            print(f"   Tokens: {result.metadata.get('token_count', 'N/A')}")
-
-            # Show enhanced context information
-            surrounding = result.metadata.get("surrounding_context", {})
-            if surrounding:
-                print(f"   Context available: {list(surrounding.keys())}")
-                if surrounding.get("prev_agent_msg"):
-                    print(f"   Previous Agent: {surrounding['prev_agent_msg']}")
-                if surrounding.get("next_agent_msg"):
-                    print(f"   Next Agent: {surrounding['next_agent_msg']}")
-                if surrounding.get("prev_user_msg"):
-                    print(f"   Previous User: {surrounding['prev_user_msg']}")
-                if surrounding.get("next_user_msg"):
-                    print(f"   Next User: {surrounding['next_user_msg']}")
+            # Show all_one_need field
+            all_one_need = result.metadata.get("all_one_need", "")
+            if all_one_need:
+                print(f"   All One Need: {all_one_need}")
             print()
 
     asyncio.run(main())

@@ -92,15 +92,15 @@ class InstructionImprovementResponse(BaseModel):
     clarity_score: float = Field(
         ge=0.0,
         le=1.0,
-        description="Clarity score (0-1) indicating how clear the original user instruction was, 0 means the original user instruction could be ambiguous or missing important details.",
+        description="Clarity score (0-1) indicating how clear the original user instruction is (the swe agent is considering the instruction as unclear, but you should give your own judgement combining with the past interactions with the specific user, which the swe agent has no access to), 0 means the original user instruction could be ambiguous or missing important details.",
     )
     improved_instruction: str = Field(
-        description="The improved instruction personalized to the user, think hard about what users really want to achieve and output markdown bullet points format with question marks emoji in the points that you are not sure about."
+        description="Suggestions about what the users might actually mean and what the swe agent should do to help the user achieve their goal. If the user's instruction is super unclear, should suggest the swe agent to ask for clarification. Also suggest some emojis to make the conversation with the user more engaging if users would prefer that based on your understanding of the user."
     )
     confidence_score: float = Field(
         ge=0.0,
         le=1.0,
-        description="Confidence score (0-1) for how confident you are about the improved instruction that recovers the user's `true` intent, 0 means the improved instruction is not confident enough to recover the user's `true` intent, which could be a strong indicator for the coding agent to ask for clarification.",
+        description="Confidence score (0-1) for how confident you are about your suggestions to the swe agent. 0 means not confident at all, 1 means very confident.",
     )
 
 
