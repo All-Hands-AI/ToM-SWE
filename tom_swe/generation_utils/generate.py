@@ -6,6 +6,7 @@ in prompts and handle parsing with fallback mechanisms.
 """
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Optional, Type, TypeVar
 
@@ -15,6 +16,10 @@ from pydantic import BaseModel, validate_call
 from .output_parsers import PydanticOutputParser
 
 logger = logging.getLogger(__name__)
+
+# Set logger level based on environment variable
+log_level = os.getenv("LOG_LEVEL", "info").upper()
+logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -109,7 +114,7 @@ async def generate_with_schema(
     format_instructions = output_parser.get_format_instructions()
     full_prompt = f"{prompt}\n\n{format_instructions}"
 
-    logger.debug(f"Full prompt length: {len(full_prompt)} characters")
+    logger.info(f"Full prompt {full_prompt} characters")
 
     # Prepare completion arguments
     completion_args = {

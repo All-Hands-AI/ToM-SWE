@@ -42,8 +42,9 @@ from .tom_module import UserMentalStateAnalyzer
 # Load environment variables
 load_dotenv()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging - use environment variable for level
+log_level = os.getenv("LOG_LEVEL", "info").upper()
+logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 logger = logging.getLogger(__name__)
 
 # Configure litellm
@@ -54,6 +55,9 @@ DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
 LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
 
+# Export list for better IDE support
+__all__ = ["ToMAgent", "ToMAgentConfig", "create_tom_agent"]
+
 
 @dataclass
 class ToMAgentConfig:
@@ -62,8 +66,15 @@ class ToMAgentConfig:
     processed_data_dir: str = "./data/processed_data"
     user_model_dir: str = "./data/user_model"
     llm_model: Optional[str] = None
-    use_contextual_rag: bool = True
     enable_rag: bool = True
+
+
+@dataclass
+class InstructionScores:
+    """Scores for instruction analysis."""
+
+    confidence_score: float
+    clarity_score: float
 
 
 class ToMAgent:
@@ -74,7 +85,7 @@ class ToMAgent:
     to provide highly personalized guidance for software engineering tasks.
     """
 
-    def __init__(self, config: Optional[ToMAgentConfig] = None):
+    def __init__(self, config: Optional[ToMAgentConfig] = None) -> None:
         """
         Initialize the ToM agent.
 
@@ -87,7 +98,6 @@ class ToMAgent:
         self.processed_data_dir = config.processed_data_dir
         self.user_model_dir = config.user_model_dir
         self.llm_model = config.llm_model or DEFAULT_LLM_MODEL
-        self.use_contextual_rag = config.use_contextual_rag
         self.enable_rag = config.enable_rag
 
         # Initialize ToM analyzer
@@ -107,8 +117,6 @@ class ToMAgent:
             logger.info("Initializing RAG agent...")
             self._rag_agent = await create_rag_agent(
                 data_path=self.processed_data_dir,
-                user_model_path=self.user_model_dir,
-                use_contextual=self.use_contextual_rag,
                 llm_model=self.llm_model,
             )
             logger.info("RAG agent initialized successfully")
@@ -161,7 +169,6 @@ class ToMAgent:
         prompt: str,
         output_type: Any,
         temperature: float = 0.3,
-        max_tokens: int = 1024,
     ) -> Optional[Any]:
         """Call the LLM with structured output using new generation utilities."""
         if not LITELLM_API_KEY:
@@ -172,7 +179,6 @@ class ToMAgent:
             config = LLMConfig(
                 model=self.llm_model,
                 temperature=temperature,
-                max_tokens=max_tokens,
                 api_key=LITELLM_API_KEY,
                 api_base=LITELLM_BASE_URL,
             )
@@ -218,7 +224,7 @@ class ToMAgent:
         self,
         user_context: UserContext,
         original_instruction: str,
-        domain_context: Optional[str] = None,
+        user_msg_context: Optional[str] = None,
     ) -> List[InstructionRecommendation]:
         """
         Propose improved instructions based on user context.
@@ -226,7 +232,7 @@ class ToMAgent:
         Args:
             user_context: The user's current context
             original_instruction: The original instruction to improve
-            domain_context: Optional domain-specific context
+            user_msg_context: Optional user message context
 
         Returns:
             List of instruction recommendations
@@ -234,47 +240,161 @@ class ToMAgent:
         logger.info(f"Proposing instructions for user {user_context.user_id}")
 
         # Get relevant user behavior from RAG (if enabled)
-        relevant_behavior = ""
-        if self.enable_rag:
-            rag_start_time = time.time()
-            logger.info("⏱️  Starting RAG retrieval for instruction improvement...")
-
-            rag_agent = await self._get_rag_agent()
-            rag_init_time = time.time()
-            logger.info(f"⏱️  RAG agent initialization: {rag_init_time - rag_start_time:.2f}s")
-
-            # Build context-aware query for RAG
-            rag_query = f"User preferences and behavior patterns related to: {original_instruction}"
-            if domain_context:
-                rag_query += f" in context of: {domain_context}"
-
-            # Retrieve relevant user behavior (retrieval only, no generation)
-            query_start_time = time.time()
-            retrieved_docs = rag_agent.retrieve(rag_query, k=5)
-            query_end_time = time.time()
-
-            # Extract content from retrieved documents
-            behavior_parts = []
-            for i, doc in enumerate(retrieved_docs[:3]):  # Use top 3 for context
-                behavior_parts.append(
-                    f"Context {i+1}: {doc.content[:500]}..."
-                )  # Truncate for efficiency
-
-            relevant_behavior = (
-                "\n\n".join(behavior_parts) if behavior_parts else "No relevant patterns found"
-            )
-
-            total_rag_time = query_end_time - rag_start_time
-            query_time = query_end_time - query_start_time
-            logger.info(f"⏱️  RAG query execution: {query_time:.2f}s")
-            logger.info(f"⏱️  Total RAG time for instructions: {total_rag_time:.2f}s")
-        else:
-            relevant_behavior = "RAG disabled - using user context only"
+        relevant_behavior = await self._get_relevant_behavior(original_instruction)
 
         # Build prompt for instruction improvement
-        prompt = f"""
-Based on the following user context and behavior patterns, propose an improved version of the given instruction.
-The improved instruction should be personalized to the user's preferences, mental state, and working style.
+        prompt = self._build_instruction_prompt(
+            user_context, original_instruction, relevant_behavior, user_msg_context
+        )
+
+        # DEBUG: Check prompt length before LLM call
+        self._debug_large_prompt(prompt, user_context, relevant_behavior)
+
+        result = await self._call_llm_structured(
+            prompt,
+            output_type=InstructionImprovementResponse,
+            temperature=0.2,
+        )
+        logger.info(f"🔍 PROPOSE_INSTRUCTIONS RESULT: {result}")
+        if not result:
+            return []
+
+        # Post-process the instruction with formatted output
+        scores = InstructionScores(
+            confidence_score=result.confidence_score,
+            clarity_score=result.clarity_score,
+        )
+        final_instruction = self._format_proposed_instruction(
+            original_instruction=original_instruction,
+            improved_instruction=result.improved_instruction,
+            reasoning=result.reasoning,
+            scores=scores,
+        )
+
+        return [
+            InstructionRecommendation(
+                original_instruction=original_instruction,
+                improved_instruction=final_instruction,
+                reasoning=result.reasoning,
+                confidence_score=result.confidence_score,
+                clarity_score=result.clarity_score,
+            )
+        ]
+
+    def _format_proposed_instruction(
+        self,
+        original_instruction: str,
+        improved_instruction: str,
+        reasoning: str,
+        scores: InstructionScores,
+    ) -> str:
+        """
+        Format the proposed instruction with clarity analysis and interpretation.
+
+        Args:
+            original_instruction: The user's original message
+            improved_instruction: The AI's interpretation of what user meant
+            reasoning: Reasoning for the interpretation
+            scores: Scores containing confidence and clarity values
+
+        Returns:
+            Formatted instruction with analysis and clarification request
+        """
+        final_instruction = f"""The user's original message was: '{original_instruction}'
+*****************ToM Agent Analysis Start Here*****************
+(ToM agent reasoning is not from the actual user, but aims to help you better understand the user's intent)
+The clarity score of the original message was: {scores.clarity_score*100:.0f}%, (here's the reasoning: {reasoning}).
+
+Based on the conversation context and user patterns, here's a clearer interpretation of what the user likely means:
+
+## Improved Instruction
+{improved_instruction}
+
+## Confidence in interpretation
+Confidence in interpretation: {scores.confidence_score*100:.0f}%
+
+## YOU MUST FOLLOW THIS INSTRUCTION
+**IMPORTANT** (you HAVE to follow this instruction): First show user the improved instruction (just copy the improved instruction section above) and ask if they would like to continue with the plan (e.g., 'Would you like to continue with the plan? Or do you have any other plans in mind?'). And offer to explore the current environment a bit more first (e.g., 'Would you like to explore the current environment a bit more first?')"""
+
+        return final_instruction
+
+    async def _get_relevant_behavior(self, original_instruction: str) -> str:
+        """Get relevant user behavior from RAG if enabled."""
+        if not self.enable_rag:
+            return "RAG disabled - using user context only"
+
+        rag_start_time = time.time()
+        logger.info("⏱️  Starting RAG retrieval for instruction improvement...")
+
+        rag_agent = await self._get_rag_agent()
+        rag_init_time = time.time()
+        logger.info(f"⏱️  RAG agent initialization: {rag_init_time - rag_start_time:.2f}s")
+
+        # Build direct query for user message search
+        rag_query = original_instruction  # Search directly against user messages
+
+        # Log the query content and token count
+        query_tokens = len(rag_query.split()) * 1.3  # Rough estimate
+        logger.info("🔍 RAG QUERY DEBUG:")
+        logger.info(f"  - Query: '{rag_query}'")
+        logger.info(f"  - Query length: {len(rag_query)} characters")
+        logger.info(f"  - Estimated tokens: ~{query_tokens:.0f}")
+
+        # Retrieve relevant user behavior (retrieval only, no generation)
+        query_start_time = time.time()
+        retrieved_docs = rag_agent.retrieve(rag_query, k=5)
+        query_end_time = time.time()
+
+        # Extract content from retrieved documents (now user messages with context)
+        behavior_parts = []
+        for i, doc in enumerate(retrieved_docs[:3]):  # Use top 3 for context
+            # Format user message with surrounding context
+            user_msg = doc.content
+            metadata = doc.metadata
+
+            # Build context string
+            context_parts = [f"User msg: {user_msg}"]
+
+            # Add session context if available
+            if metadata.get("session_title"):
+                context_parts.append(f"Session: {metadata['session_title']}")
+            if metadata.get("repository_context"):
+                context_parts.append(f"Project: {metadata['repository_context']}")
+
+            # Add surrounding context
+            surrounding = metadata.get("surrounding_context", {})
+            if surrounding.get("prev_agent_msg"):
+                context_parts.append(f"Previous agent: {surrounding['prev_agent_msg']}")
+            if surrounding.get("next_agent_msg"):
+                context_parts.append(f"Next agent: {surrounding['next_agent_msg']}")
+            if surrounding.get("prev_user_msg"):
+                context_parts.append(f"Previous user: {surrounding['prev_user_msg']}")
+            if surrounding.get("next_user_msg"):
+                context_parts.append(f"Next user: {surrounding['next_user_msg']}")
+
+            behavior_parts.append(f"Context {i+1}:\n" + "\n".join(context_parts))
+
+        relevant_behavior = (
+            "\n\n".join(behavior_parts) if behavior_parts else "No relevant patterns found"
+        )
+
+        total_rag_time = query_end_time - rag_start_time
+        query_time = query_end_time - query_start_time
+        logger.info(f"⏱️  RAG query execution: {query_time:.2f}s")
+        logger.info(f"⏱️  Total RAG time for instructions: {total_rag_time:.2f}s")
+
+        return relevant_behavior
+
+    def _build_instruction_prompt(
+        self,
+        user_context: UserContext,
+        original_instruction: str,
+        relevant_behavior: str,
+        user_msg_context: Optional[str],
+    ) -> str:
+        """Build the prompt for instruction improvement."""
+        return f"""
+Based on the following user context and behavior patterns, propose a plan to help the user achieve their goal (use markdown bullet points format).
 
 User Context:
 - User ID: {user_context.user_id}
@@ -288,23 +408,17 @@ Relevant User Behavior Patterns:
 Original Instruction:
 "{original_instruction}"
 
-Domain Context:
-{domain_context or "General software development"}
+Context (interactions happening before the original instruction, if any):
+{user_msg_context}
 
-Please provide:
-1. An improved instruction that is personalized to this user
-2. Clear reasoning for the improvements made
-3. Confidence score (0-1) for the personalization
-4. Key personalization factors applied
+Please generate the plan that you think the user was actually trying to achieve (following the format below).
 """
 
-        # DEBUG: Check prompt length before LLM call
+    def _debug_large_prompt(
+        self, prompt: str, user_context: UserContext, relevant_behavior: str
+    ) -> None:
+        """Debug large prompts by logging details and saving to file."""
         prompt_length = len(prompt)
-        logger.info("🔍 PROPOSE_INSTRUCTIONS DEBUG:")
-        logger.info(f"  - Prompt length: {prompt_length:,} characters")
-        logger.info(f"  - Estimated tokens: ~{prompt_length // 4:,} tokens")
-        logger.info(f"  - Relevant behavior length: {len(relevant_behavior):,} characters")
-        logger.info(f"  - User context sessions: {len(user_context.recent_sessions or [])}")
 
         if prompt_length > 50000:  # If prompt is suspiciously large
             logger.warning(f"⚠️  LARGE PROMPT DETECTED: {prompt_length:,} characters")
@@ -318,23 +432,6 @@ Please provide:
             with open("/tmp/large_prompt_debug.txt", "w") as f:
                 f.write(prompt)
             logger.info("  - Full prompt saved to /tmp/large_prompt_debug.txt")
-
-        result = await self._call_llm_structured(
-            prompt,
-            output_type=InstructionImprovementResponse,
-            temperature=0.2,
-        )
-        if not result:
-            return []
-
-        return [
-            InstructionRecommendation(
-                original_instruction=original_instruction,
-                improved_instruction=result.improved_instruction,
-                reasoning=result.reasoning,
-                confidence_score=result.confidence_score,
-            )
-        ]
 
     async def suggest_next_actions(
         self, user_context: UserContext, current_task_context: Optional[str] = None
@@ -466,7 +563,7 @@ For each suggested action, provide:
         user_id: str,
         instruction: Optional[str] = None,
         current_task: Optional[str] = None,
-        domain_context: Optional[str] = None,
+        user_msg_context: Optional[str] = None,
     ) -> PersonalizedGuidance:
         """
         Get comprehensive personalized guidance for a user.
@@ -475,7 +572,7 @@ For each suggested action, provide:
             user_id: The user ID
             instruction: Optional instruction to improve
             current_task: Optional current task context
-            domain_context: Optional domain-specific context
+            user_msg_context: Optional user message context
 
         Returns:
             PersonalizedGuidance object with complete recommendations
@@ -489,7 +586,7 @@ For each suggested action, provide:
         instruction_recommendations = []
         if instruction:
             instruction_recommendations = await self.propose_instructions(
-                user_context, instruction, domain_context
+                user_context, instruction, user_msg_context
             )
 
         # Generate next action suggestions
@@ -593,7 +690,7 @@ if __name__ == "__main__":
             user_id=user_id,
             instruction=instruction,
             current_task="Debugging Python application",
-            domain_context="Web development",
+            user_msg_context="Web development",
         )
 
         print(f"Personalized guidance for user {user_id}:")

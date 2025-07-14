@@ -86,14 +86,21 @@ class OverallUserAnalysis(BaseModel):
 class InstructionImprovementResponse(BaseModel):
     """Pydantic model for LLM response to instruction improvement requests."""
 
-    improved_instruction: str = Field(
-        description="The improved instruction personalized to the user's preferences and mental state"
-    )
     reasoning: str = Field(
-        description="Clear reasoning for the improvements made, explaining why they are suited to this user"
+        description="Clear reasoning for whether the user's original instruction is clear, focus on what could be missing and what could be inferred from the user's profile and recent sessions."
+    )
+    clarity_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Clarity score (0-1) indicating how clear the original user instruction was, 0 means the original user instruction could be ambiguous or missing important details.",
+    )
+    improved_instruction: str = Field(
+        description="The improved instruction personalized to the user, think hard about what users really want to achieve and output markdown bullet points format with question marks emoji in the points that you are not sure about."
     )
     confidence_score: float = Field(
-        ge=0.0, le=1.0, description="Confidence score (0-1) for the personalization quality"
+        ge=0.0,
+        le=1.0,
+        description="Confidence score (0-1) for how confident you are about the improved instruction that recovers the user's `true` intent, 0 means the improved instruction is not confident enough to recover the user's `true` intent, which could be a strong indicator for the coding agent to ask for clarification.",
     )
 
 
@@ -134,11 +141,16 @@ class InstructionRecommendation(BaseModel):
 
     original_instruction: str = Field(description="The original instruction that was improved")
     improved_instruction: str = Field(
-        description="The improved instruction personalized to the user"
+        description="The improved instruction personalized to the user, think hard about what users really want to achieve and output markdown bullet points format with question marks in the points that you are not sure about. (style: blue text, italic)"
     )
     reasoning: str = Field(description="Reasoning for the improvements made")
     confidence_score: float = Field(
         ge=0.0, le=1.0, description="Confidence score for the personalization quality"
+    )
+    clarity_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Clarity score (0-1) indicating how clear the original instruction was",
     )
 
 

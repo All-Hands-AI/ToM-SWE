@@ -99,6 +99,7 @@ def mock_tom_agent() -> AsyncMock:
             improved_instruction="Debug the function by systematically adding logging statements and checking each variable step-by-step",
             reasoning="Personalized for user's preference for detailed, systematic approaches",
             confidence_score=0.85,
+            clarity_score=0.3,
         )
     ]
     mock_agent.propose_instructions.return_value = instruction_recommendations

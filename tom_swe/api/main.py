@@ -27,9 +27,14 @@ from tom_swe.api.models import (
 )
 from tom_swe.tom_agent import ToMAgent, create_tom_agent
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging - use environment variable for level
+log_level = os.getenv("LOG_LEVEL", "info").upper()
+logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 logger = logging.getLogger(__name__)
+
+# Ensure all tom_swe loggers use the same level
+for logger_name in ["tom_swe.generation_utils.generate", "tom_swe.tom_agent", "tom_swe.rag_module"]:
+    logging.getLogger(logger_name).setLevel(getattr(logging, log_level, logging.INFO))
 
 
 async def initialize_tom_agent() -> ToMAgent | None:
@@ -130,7 +135,7 @@ async def propose_instructions(request: ProposeInstructionsRequest) -> ProposeIn
         recommendations = await app.state.tom_agent.propose_instructions(
             user_context=user_context,
             original_instruction=request.original_instruction,
-            domain_context=request.context,
+            user_msg_context=request.context,
         )
 
         return ProposeInstructionsResponse(
