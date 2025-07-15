@@ -16,6 +16,7 @@ from tom_swe.tom_agent import (
     InstructionRecommendation,
     NextActionSuggestion,
     ToMAgent,
+    ToMAgentConfig,
     UserContext,
 )
 
@@ -70,11 +71,12 @@ def tom_agent(temp_dir: str) -> ToMAgent:
     os.makedirs(processed_data_dir, exist_ok=True)
     os.makedirs(user_model_dir, exist_ok=True)
 
-    agent = ToMAgent(
+    config = ToMAgentConfig(
         processed_data_dir=processed_data_dir,
         user_model_dir=user_model_dir,
         llm_model="test_model",
     )
+    agent = ToMAgent(config=config)
     return agent
 
 
@@ -148,7 +150,7 @@ class TestProposeInstructions:
                 recommendations = await tom_agent.propose_instructions(
                     user_context=sample_user_context,
                     original_instruction=original_instruction,
-                    domain_context="Python development",
+                    user_msg_context="Python development",
                 )
 
                 assert len(recommendations) == 1
@@ -158,7 +160,8 @@ class TestProposeInstructions:
                 assert "step-by-step" in rec.improved_instruction
                 assert "systematic" in rec.reasoning
                 assert rec.confidence_score == 0.85
-                assert "detailed_explanations" in rec.personalization_factors
+                # personalization_factors field was removed, checking clarity_score instead
+                assert hasattr(rec, "clarity_score")
 
                 # Verify RAG agent was called with appropriate query
                 mock_rag_agent.query.assert_called_once()
@@ -176,7 +179,7 @@ class TestProposeInstructions:
                 recommendations = await tom_agent.propose_instructions(
                     user_context=sample_user_context,
                     original_instruction="Debug the function",
-                    domain_context="Python development",
+                    user_msg_context="Python development",
                 )
 
                 assert recommendations == []
@@ -191,26 +194,26 @@ class TestProposeInstructions:
                 recommendations = await tom_agent.propose_instructions(
                     user_context=sample_user_context,
                     original_instruction="Debug the function",
-                    domain_context="Python development",
+                    user_msg_context="Python development",
                 )
 
                 assert recommendations == []
 
     @pytest.mark.asyncio
-    async def test_propose_instructions_no_domain_context(
+    async def test_propose_instructions_no_user_msg_context(
         self,
         tom_agent: ToMAgent,
         sample_user_context: UserContext,
         mock_rag_agent: AsyncMock,
         mock_llm_instruction_response: str,
     ) -> None:
-        """Test instruction improvement without domain context."""
+        """Test instruction improvement without user message context."""
         with patch.object(tom_agent, "_get_rag_agent", return_value=mock_rag_agent):
             with patch.object(tom_agent, "_call_llm", return_value=mock_llm_instruction_response):
                 recommendations = await tom_agent.propose_instructions(
                     user_context=sample_user_context,
                     original_instruction="Debug the function",
-                    domain_context=None,
+                    user_msg_context=None,
                 )
 
                 assert len(recommendations) == 1

@@ -7,27 +7,28 @@ typed messages and interaction patterns using Large Language Models.
 """
 
 from tom_swe.database import (
+    InstructionImprovementResponse,
+    InstructionRecommendation,
+    NextActionsResponse,
+    NextActionSuggestion,
     OverallUserAnalysis,
+    PersonalizedGuidance,
     SessionSummary,
+    UserContext,
     UserMessageAnalysis,
     UserProfile,
 )
 from tom_swe.rag_module import (
-    ContextualVectorDB,
+    ChunkingConfig,
     Document,
     RAGAgent,
     RetrievalResult,
     VectorDB,
     create_rag_agent,
     load_processed_data,
-    load_user_model_data,
 )
 from tom_swe.tom_agent import (
-    InstructionRecommendation,
-    NextActionSuggestion,
-    PersonalizedGuidance,
     ToMAgent,
-    UserContext,
     create_tom_agent,
 )
 from tom_swe.tom_module import (
@@ -39,7 +40,6 @@ __author__ = "Research Team"
 __description__ = "LLM-powered Theory of Mind analysis for user behavior prediction"
 
 __all__ = [
-    "ContextualVectorDB",
     "Document",
     "InstructionRecommendation",
     "NextActionSuggestion",
@@ -58,4 +58,11 @@ __all__ = [
     "create_tom_agent",
     "load_processed_data",
     "load_user_model_data",
+    "ChunkingConfig",
+    "InstructionImprovementResponse",
+    "InstructionRecommendation",
+    "NextActionsResponse",
+    "NextActionSuggestion",
+    "PersonalizedGuidance",
+    "UserContext",
 ]

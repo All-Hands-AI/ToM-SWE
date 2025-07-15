@@ -9,7 +9,7 @@ and serialization in the ToM module.
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 
 class UserMessageAnalysis(BaseModel):
@@ -86,17 +86,21 @@ class OverallUserAnalysis(BaseModel):
 class InstructionImprovementResponse(BaseModel):
     """Pydantic model for LLM response to instruction improvement requests."""
 
-    improved_instruction: str = Field(
-        description="The improved instruction personalized to the user's preferences and mental state"
-    )
     reasoning: str = Field(
-        description="Clear reasoning for the improvements made, explaining why they are suited to this user"
+        description="Clear reasoning for whether the user's original instruction is clear, focus on what could be missing and what could be inferred from the user's profile and recent sessions."
+    )
+    clarity_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Clarity score (0-1) indicating how clear the original user instruction is (the swe agent is considering the instruction as unclear, but you should give your own judgement combining with the past interactions with the specific user, which the swe agent has no access to), 0 means the original user instruction could be ambiguous or missing important details.",
+    )
+    improved_instruction: str = Field(
+        description="Suggestions to the swe agent on how to better understand and help the user (e.g., 'you could respond the user with: `Based on your previous projects on ..., you might want to ...`'). If the user's instruction is unclear (low clarity score), should suggest the swe agent to ask for clarification (Be very strong about asking the agent to not do anything concretely without figuring out the user's intent first, e.g., 'IMPORTANT: Don't DO anything concretely, FIRST ask for clarification!!'). Also suggest some emojis to make the conversation with the user more engaging if users would prefer that based on your understanding of the user (e.g., 'you could use 🤔 to show that you are thinking about the user's request, or 🤯 to show that you are surprised by the user's request, or 🤗 to show that you are happy to help the user, etc.). Lastly, give swe agent suggestions on how to be mindful about the user's preferences and mental state (e.g., Avoid asking too many questions all at once, making the questions easier to answer for the user, making the output easier to understand for the user, etc.)."
     )
     confidence_score: float = Field(
-        ge=0.0, le=1.0, description="Confidence score (0-1) for the personalization quality"
-    )
-    personalization_factors: List[str] = Field(
-        description="Key personalization factors applied from the user's profile and preferences"
+        ge=0.0,
+        le=1.0,
+        description="Confidence score (0-1) for how confident you are about your suggestions to the swe agent. 0 means not confident at all, 1 means very confident.",
     )
 
 
@@ -120,10 +124,16 @@ class NextActionsResponse(BaseModel):
     """Pydantic model for LLM response to next action suggestions requests."""
 
     suggestions: List[NextActionSuggestionLLM] = Field(
-        min_length=1,
-        max_length=5,
         description="List of 1-5 next action suggestions ranked by relevance and priority",
     )
+
+    @validator("suggestions")
+    def validate_suggestions_length(
+        cls, v: List[NextActionSuggestionLLM]  # noqa: N805
+    ) -> List[NextActionSuggestionLLM]:
+        if len(v) < 1 or len(v) > 5:
+            raise ValueError("suggestions must contain 1-5 items")
+        return v
 
 
 class InstructionRecommendation(BaseModel):
@@ -131,13 +141,17 @@ class InstructionRecommendation(BaseModel):
 
     original_instruction: str = Field(description="The original instruction that was improved")
     improved_instruction: str = Field(
-        description="The improved instruction personalized to the user"
+        description="The improved instruction personalized to the user, think hard about what users really want to achieve and output markdown bullet points format with question marks in the points that you are not sure about. (style: blue text, italic)"
     )
     reasoning: str = Field(description="Reasoning for the improvements made")
     confidence_score: float = Field(
         ge=0.0, le=1.0, description="Confidence score for the personalization quality"
     )
-    personalization_factors: List[str] = Field(description="Key personalization factors applied")
+    clarity_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Clarity score (0-1) indicating how clear the original instruction was",
+    )
 
 
 class NextActionSuggestion(BaseModel):
