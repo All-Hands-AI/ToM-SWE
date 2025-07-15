@@ -96,7 +96,7 @@ async def get_improved_instructions(client: ToMAgentClient, user_id: str) -> Non
     """Get improved instructions for a user task."""
     print("📝 Step 1: Getting improved instructions...")
     try:
-        context = "User message: I need help debugging this Python function that keeps throwing IndexError. Previous conversation includes discussion about web development and systematic debugging approaches."
+        context = ""
 
         instructions_response = await client.propose_instructions(
             user_id=user_id,
@@ -110,8 +110,6 @@ async def get_improved_instructions(client: ToMAgentClient, user_id: str) -> Non
 
             for i, rec in enumerate(instructions_response["recommendations"], 1):
                 print(f"  {i}. Improved: {rec['improved_instruction']}")
-                print(f"     Confidence: {rec['confidence_score']:.2f}")
-                print(f"     Reasoning: {rec['reasoning']}")
         else:
             print(f"⚠️  {instructions_response['message']}")
     except httpx.HTTPStatusError as e:
@@ -176,8 +174,8 @@ async def main() -> None:
         print()
 
         await get_improved_instructions(client, user_id)
-        await get_next_actions(client, user_id)
-        await show_final_status(client, user_id)
+        # await get_next_actions(client, user_id)
+        # await show_final_status(client, user_id)
 
     except httpx.ConnectError:
         print("❌ Could not connect to the API server.")

@@ -386,24 +386,24 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
     ) -> str:
         """Build the prompt for instruction improvement."""
         return f"""
-Based on the following user context and behavior patterns, propose a plan to help the user achieve their goal.
+Based on the following information, provide suggestions to help the agent better understand and help the user.
 
-User Context:
-- User ID: {user_context.user_id}
-- Mental State Summary: {user_context.mental_state_summary}
-- Preferences: {', '.join(user_context.preferences or [])}
-- Recent Session Count: {len(user_context.recent_sessions or [])}
-
-Relevant Past User Interaction Contexts:
-{relevant_behavior}
-
-Original Instruction:
+## Original Current User Instruction:
 "{original_instruction}"
 
-Context (interactions happening before the original instruction, if any):
+## Context
+### Current context (interactions happening before the original instruction, if any):
+```
 {user_msg_context}
+```
 
-Please generate suggestions to help the agent better understand and help the user (following the format below).
+### Past context--Relevant Past User Interaction with the Agent:
+(Note the past context is automatically retrieved from the RAG agent. RAG agent could make mistakes, so use this with caution.)
+```
+{relevant_behavior}
+```
+
+Please generate suggestions to help the **agent** (note that you are giving suggestions to the agent, not the user) better understand and help the **user** (following the format below).
 """
 
     def _debug_large_prompt(
