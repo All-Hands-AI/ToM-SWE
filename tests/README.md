@@ -1,99 +1,127 @@
-# Tom Module Tests
+# Tests for ToM-SWE (Post-Cleanup)
 
-This directory contains comprehensive tests for the tom_module's 3-tier user analysis system.
+This directory contains tests for the cleaned-up ToM-SWE system focused on **instruction improvement functionality only**.
 
-## Test Coverage
+## 🧪 Current Test Files
 
-### **TestDataLoading**
-- Tests session discovery (`get_user_session_ids`)
-- Handles missing users, empty files, and valid users
+### ✅ Active Test Files
 
-### **TestStep1AnalyzeUserMentalState**
-- Tests **Step 1** of `process_and_save_user_session`
-- Covers LLM analysis and error handling
-- Uses mocked LLM responses for consistency
+1. **`test_instruction_improvement.py`** - Core functionality tests
+   - ToM Agent creation and configuration
+   - `analyze_user_context()` method
+   - `propose_instructions()` method
+   - RAG integration with instruction improvement
+   - Database model validation
+   - Error handling and edge cases
 
-### **TestStep2SaveSessionAnalysesToJsonl**
-- Tests **Step 2** of `process_and_save_user_session`
-- Validates JSONL file format and content
-- Tests directory creation and file writing
+2. **`test_api_instruction_improvement.py`** - API functionality tests
+   - `/propose_instructions` endpoint
+   - `/health` endpoint
+   - `/conversation_status` endpoint
+   - Request/response model validation
+   - API documentation and OpenAPI schema
+   - Integration tests
 
-### **TestStep3SummarizeSessionFromAnalyses**
-- Tests **Step 3** of `process_and_save_user_session`
-- Validates session summary aggregation logic
-- Tests intent counting and emotion progression
+3. **`test_process_and_save_steps.py`** - ToM module tests
+   - User mental state analysis pipeline
+   - Session processing functionality
+   - Data loading and validation
+   - (Kept because tom_module.py functionality is still used)
 
-### **TestStep4UpdateOverallUserAnalysis**
-- Tests **Step 4** of `process_and_save_user_session`
-- Validates user profile creation and updates
-- Tests new users vs existing users
+### 🗑️ Removed Test Files
 
-### **TestIntegrationProcessAndSaveUserSession**
-- Tests the complete `process_and_save_user_session` pipeline
-- End-to-end validation of all 3 tiers
-- Tests `process_all_user_sessions` for multiple sessions
+- ~~`test_api.py`~~ - **REMOVED** (tested removed next action endpoints)
+- ~~`test_tom_agent.py`~~ - **REMOVED** (tested removed tom_agent methods)
 
-### **TestUtilityFunctions**
-- Tests helper functions and directory creation
-- Profile update logic and data structures
+### 📋 Supporting Files
 
-## Running Tests
+- **`conftest.py`** - Test fixtures and mock data (still relevant)
+- **`__init__.py`** - Package initialization
 
-### **Run All Tests**
+## 🚀 Running Tests
+
+### Run All Tests
 ```bash
-# From project root
-python tests/run_tests.py
+# Run all tests in the tests directory
+uv run pytest
 
-# Or with pytest directly
-pytest tests/ -v
+# Or run specific test files
+uv run pytest tests/test_instruction_improvement.py tests/test_api_instruction_improvement.py tests/test_process_and_save_steps.py
 ```
 
-### **Run Specific Test File**
+### Run Specific Test Categories
 ```bash
-# Using test runner
-python tests/run_tests.py test_process_and_save_steps.py
+# Core functionality only
+uv run pytest tests/test_instruction_improvement.py -v
 
-# Or with pytest
-pytest tests/test_process_and_save_steps.py -v
+# API tests only
+uv run pytest tests/test_api_instruction_improvement.py -v
+
+# ToM module tests only
+uv run pytest tests/test_process_and_save_steps.py -v
+
+# Run with coverage
+uv run pytest --cov=tom_swe --cov-report=html
 ```
 
-### **Run Specific Test Class**
-```bash
-pytest tests/test_process_and_save_steps.py::TestIntegrationProcessAndSaveUserSession -v
-```
+## 🎯 Test Coverage
 
-### **Run Specific Test Method**
-```bash
-pytest tests/test_process_and_save_steps.py::TestIntegrationProcessAndSaveUserSession::test_process_and_save_user_session_success -v
-```
+The test suite covers:
 
-## Test Data
+### Core Functionality
+- ✅ User context analysis
+- ✅ Instruction improvement generation
+- ✅ RAG context retrieval
+- ✅ LLM integration
+- ✅ Error handling and fallbacks
 
-Tests use temporary directories and mock data:
-- **`conftest.py`**: Contains fixtures for test data and mock objects
-- **Mock LLM responses**: Prevents real API calls during testing
-- **Temporary directories**: Isolated file operations
-- **Sample user data**: Realistic session structures
+### API Layer
+- ✅ All remaining endpoints
+- ✅ Request/response validation
+- ✅ Error responses and status codes
+- ✅ OpenAPI documentation
 
-## Key Testing Features
+### Data Models
+- ✅ Pydantic model validation
+- ✅ Score constraints (0-1 range)
+- ✅ Required field validation
 
-- ✅ **No external dependencies**: Tests use mocked LLM calls
-- ✅ **Isolated file operations**: Each test uses temp directories
-- ✅ **Comprehensive step coverage**: Tests each step in the pipeline
-- ✅ **Error handling**: Tests missing files, empty data, etc.
-- ✅ **Data validation**: Verifies JSONL format, JSON structure
-- ✅ **Integration testing**: End-to-end pipeline validation
+### Cleanup Verification
+- ✅ Confirms removed methods/models are gone
+- ✅ Verifies remaining functionality works
+- ✅ Tests that removed API endpoints return 404
 
-## Expected Output Structure
+## 📊 What's Tested vs. What's Removed
 
-When tests run successfully, they validate the creation of:
+### ✅ Still Tested (Core Features)
+- `ToMAgent.analyze_user_context()`
+- `ToMAgent.propose_instructions()`
+- `InstructionRecommendation` model
+- `/propose_instructions` API endpoint
+- RAG integration for context
+- User mental state analysis (tom_module)
 
-```
-temp_test_dir/user_model/
-├── user_model_detailed/           # Tier 1: Per-message analysis
-│   └── test_user_123/
-│       ├── session_001.jsonl      # JSONL with message analyses
-│       └── session_002.jsonl
-└── user_model_overall/            # Tier 2 & 3: Session summaries + user profiles
-    └── test_user_123.json         # Complete user analysis
-```
+### ❌ No Longer Tested (Removed Features)
+- ~~`ToMAgent.suggest_next_actions()`~~
+- ~~`ToMAgent.get_personalized_guidance()`~~
+- ~~`NextActionSuggestion` model~~
+- ~~`PersonalizedGuidance` model~~
+- ~~`/suggest_next_actions` API endpoint~~
+
+## 🔧 Development
+
+When adding new tests:
+
+1. **For core functionality** → Add to `test_instruction_improvement.py`
+2. **For API features** → Add to `test_api_instruction_improvement.py`
+3. **For tom_module features** → Add to `test_process_and_save_steps.py`
+
+## ✅ Test Status
+
+All tests should pass after the cleanup. If any tests fail:
+
+1. Check that removed functionality isn't being referenced
+2. Verify that mocks are properly set up for remaining functionality
+3. Ensure test data matches the cleaned data models
+
+The test suite comprehensively verifies that the cleaned system works correctly with only instruction improvement functionality.

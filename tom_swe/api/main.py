@@ -22,8 +22,6 @@ from tom_swe.api.models import (
     HealthResponse,
     ProposeInstructionsRequest,
     ProposeInstructionsResponse,
-    SuggestNextActionsRequest,
-    SuggestNextActionsResponse,
 )
 from tom_swe.tom_agent import ToMAgent, create_tom_agent
 
@@ -151,46 +149,6 @@ async def propose_instructions(request: ProposeInstructionsRequest) -> ProposeIn
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate instructions: {e!s}",
-        ) from e
-
-
-@app.post("/suggest_next_actions", response_model=SuggestNextActionsResponse)
-async def suggest_next_actions(request: SuggestNextActionsRequest) -> SuggestNextActionsResponse:
-    """
-    Get personalized next action suggestions based on user context and current situation.
-    """
-    if not hasattr(app.state, "tom_agent") or app.state.tom_agent is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="ToM Agent is not available",
-        )
-
-    try:
-        logger.info(f"Generating next action suggestions for user {request.user_id}")
-
-        # Analyze user context and generate next actions
-        user_context = await app.state.tom_agent.analyze_user_context(
-            user_id=request.user_id,
-            current_query=request.context,
-        )
-
-        suggestions = await app.state.tom_agent.suggest_next_actions(
-            user_context=user_context,
-            current_task_context=request.context,
-        )
-
-        return SuggestNextActionsResponse(
-            user_id=request.user_id,
-            suggestions=suggestions,
-            success=True,
-            message=f"Generated {len(suggestions)} next action suggestions",
-        )
-
-    except Exception as e:
-        logger.error(f"Error generating next actions for user {request.user_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate next actions: {e!s}",
         ) from e
 
 
