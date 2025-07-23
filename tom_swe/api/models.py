@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 
 from ..database import (
     InstructionRecommendation,
-    NextActionSuggestion,
 )
 
 
@@ -23,13 +22,6 @@ class ProposeInstructionsRequest(BaseModel):
     context: str = Field(description="Context including previous conversations and interactions")
 
 
-class SuggestNextActionsRequest(BaseModel):
-    """Request model for suggest_next_actions endpoint."""
-
-    user_id: str = Field(description="The user ID")
-    context: str = Field(description="Context including conversation history and current situation")
-
-
 class ProposeInstructionsResponse(BaseModel):
     """Response model for propose_instructions endpoint."""
 
@@ -38,15 +30,6 @@ class ProposeInstructionsResponse(BaseModel):
     recommendations: List[InstructionRecommendation] = Field(
         description="List of instruction recommendations"
     )
-    success: bool = Field(description="Whether the request was successful")
-    message: Optional[str] = Field(default=None, description="Status message")
-
-
-class SuggestNextActionsResponse(BaseModel):
-    """Response model for suggest_next_actions endpoint."""
-
-    user_id: str = Field(description="The user ID")
-    suggestions: List[NextActionSuggestion] = Field(description="List of next action suggestions")
     success: bool = Field(description="Whether the request was successful")
     message: Optional[str] = Field(default=None, description="Status message")
 

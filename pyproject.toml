@@ -141,3 +141,14 @@ known-first-party = ["tom_swe"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--disable-warnings",
+]
+asyncio_mode = "auto"

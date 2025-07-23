@@ -9,7 +9,7 @@ and serialization in the ToM module.
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
 
 class UserMessageAnalysis(BaseModel):
@@ -104,38 +104,6 @@ class InstructionImprovementResponse(BaseModel):
     )
 
 
-class NextActionSuggestionLLM(BaseModel):
-    """Pydantic model for LLM response - a single next action suggestion."""
-
-    action_description: str = Field(description="Clear description of the suggested action")
-    priority: str = Field(description="Priority level of the action", pattern="^(high|medium|low)$")
-    reasoning: str = Field(
-        description="Reasoning for why this action is suggested based on user context"
-    )
-    expected_outcome: str = Field(description="Expected outcome or benefit of taking this action")
-    user_preference_alignment: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Score (0-1) indicating how well this action aligns with user preferences",
-    )
-
-
-class NextActionsResponse(BaseModel):
-    """Pydantic model for LLM response to next action suggestions requests."""
-
-    suggestions: List[NextActionSuggestionLLM] = Field(
-        description="List of 1-5 next action suggestions ranked by relevance and priority",
-    )
-
-    @validator("suggestions")
-    def validate_suggestions_length(
-        cls, v: List[NextActionSuggestionLLM]  # noqa: N805
-    ) -> List[NextActionSuggestionLLM]:
-        if len(v) < 1 or len(v) > 5:
-            raise ValueError("suggestions must contain 1-5 items")
-        return v
-
-
 class InstructionRecommendation(BaseModel):
     """Pydantic model for an instruction recommendation."""
 
@@ -154,18 +122,6 @@ class InstructionRecommendation(BaseModel):
     )
 
 
-class NextActionSuggestion(BaseModel):
-    """Pydantic model for a next action suggestion."""
-
-    action_description: str = Field(description="Description of the suggested action")
-    priority: str = Field(description="Priority level: high, medium, or low")
-    reasoning: str = Field(description="Reasoning for the suggestion")
-    expected_outcome: str = Field(description="Expected outcome of taking this action")
-    user_preference_alignment: float = Field(
-        ge=0.0, le=1.0, description="Alignment score with user preferences"
-    )
-
-
 class UserContext(BaseModel):
     """Pydantic model for user context."""
 
@@ -177,13 +133,3 @@ class UserContext(BaseModel):
     current_query: Optional[str] = None
     preferences: Optional[List[str]] = None
     mental_state_summary: Optional[str] = None
-
-
-class PersonalizedGuidance(BaseModel):
-    """Pydantic model for complete personalized guidance."""
-
-    user_context: UserContext
-    instruction_recommendations: List[InstructionRecommendation]
-    next_action_suggestions: List[NextActionSuggestion]
-    overall_guidance: str
-    confidence_score: float
