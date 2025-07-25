@@ -1,6 +1,31 @@
-# User Research Analysis Project
+# ToM-SWE
 
-A comprehensive analysis toolkit for understanding user behavior and mental states in coding assistant interactions.
+A package for doing theory of mind on users and help SWE agents understand users better.
+
+## Quick Start
+
+To see the ToM Agent's `propose_instructions` function in action:
+
+1. Install dependencies:
+   ```bash
+   uv sync
+   ```
+
+2. Set up your LLM API credentials in `.env` file:
+   ```bash
+   # Create .env file in project root
+   LITELLM_API_KEY=your_api_key_here
+   LITELLM_BASE_URL=your_proxy_endpoint
+   DEFAULT_LLM_MODEL=litellm_proxy/claude-sonnet-4-20250514
+   ```
+
+3. Run the example:
+   ```bash
+   uv run python example.py
+   ```
+
+The example shows how the ToM Agent analyzes user context and improves vague instructions like "Fix my code" with personalized suggestions and confidence scores.
+
 
 ## Components
 
@@ -29,69 +54,6 @@ A comprehensive analysis toolkit for understanding user behavior and mental stat
 - Fast navigation and data exploration
 - Works in any terminal environment
 - Compact display of information
-
-## Installation
-
-Install with uv (recommended):
-```bash
-uv sync
-```
-
-## LLM Configuration
-
-This project uses the All Hands AI LLM proxy for sophisticated mental state analysis. You need an API key from Xingyao.
-
-### Quick Setup
-```bash
-uv run tom-config
-```
-
-This interactive script will help you:
-- Set up your API key and proxy endpoint
-- Choose the best model for your needs
-- Create a `.env` file with proper configuration
-
-### Manual Setup
-Create a `.env` file in the project root:
-```bash
-# LLM API Configuration
-LITELLM_API_KEY=your_api_key_here
-LITELLM_BASE_URL=https://your-proxy-endpoint.com
-DEFAULT_LLM_MODEL=litellm_proxy/claude-3-5-sonnet-20241022
-```
-
-### Available Models
-All models require the `litellm_proxy/` prefix:
-- `litellm_proxy/claude-sonnet-4-20250514` (Most capable)
-- `litellm_proxy/claude-opus-4-20250514` (Most capable)
-- `litellm_proxy/claude-3-5-sonnet-20241022` (Recommended)
-- `litellm_proxy/claude-3-5-haiku-20241022` (Fastest, good for testing)
-
-## Usage
-
-### Basic User Analysis
-```bash
-uv run user-analysis
-```
-
-Options:
-- `--user-id`: Analyze specific user ID
-- `--all-users`: Analyze all users
-- `--sample-size`: Sample size for all users analysis
-- `--output-dir`: Output directory for results
-- `--generate-viz`: Generate visualizations
-- `--studio-analysis`: Include studio results analysis
-
-### Theory of Mind Analysis
-Test on sample users:
-```bash
-uv run tom-test
-```
-
-Run full ToM analysis:
-```bash
-uv run tom-analyze
-```
 
 ### Web Trajectory Viewer
 Start the web server:
