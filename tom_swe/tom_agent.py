@@ -32,7 +32,11 @@ from tom_swe.database import (
     InstructionRecommendation,
     UserContext,
 )
-from tom_swe.generation_utils.generate import LLMConfig, call_llm_simple, call_llm_structured
+from tom_swe.generation_utils.generate import (
+    LLMConfig,
+    call_llm_simple,
+    call_llm_structured,
+)
 from tom_swe.rag_module import RAGAgent, create_rag_agent
 from tom_swe.tom_module import UserMentalStateAnalyzer
 
@@ -48,7 +52,9 @@ logger = logging.getLogger(__name__)
 litellm.set_verbose = False
 
 # LLM configuration
-DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514")
+DEFAULT_LLM_MODEL = os.getenv(
+    "DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514"
+)
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
 LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
 
@@ -106,7 +112,9 @@ class ToMAgent:
         self._rag_agent: Optional[RAGAgent] = None
 
         rag_status = "enabled" if self.enable_rag else "disabled"
-        logger.info(f"ToM Agent initialized with model: {self.llm_model}, RAG: {rag_status}")
+        logger.info(
+            f"ToM Agent initialized with model: {self.llm_model}, RAG: {rag_status}"
+        )
 
     async def _get_rag_agent(self) -> RAGAgent:
         """Get or initialize the RAG agent."""
@@ -323,7 +331,9 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
 
         rag_agent = await self._get_rag_agent()
         rag_init_time = time.time()
-        logger.info(f"⏱️  RAG agent initialization: {rag_init_time - rag_start_time:.2f}s")
+        logger.info(
+            f"⏱️  RAG agent initialization: {rag_init_time - rag_start_time:.2f}s"
+        )
 
         # Build direct query for user message search
         rag_query = original_instruction  # Search directly against user messages
@@ -364,7 +374,9 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
             behavior_parts.append(f"Context {i+1}:\n" + "\n".join(context_parts))
 
         relevant_behavior = (
-            "\n\n".join(behavior_parts) if behavior_parts else "No relevant patterns found"
+            "\n\n".join(behavior_parts)
+            if behavior_parts
+            else "No relevant patterns found"
         )
 
         total_rag_time = query_end_time - rag_start_time
@@ -442,16 +454,19 @@ async def create_tom_agent(
     """
     agent = ToMAgent(
         config=ToMAgentConfig(
-            processed_data_dir=processed_data_dir, user_model_dir=user_model_dir, **kwargs
+            processed_data_dir=processed_data_dir,
+            user_model_dir=user_model_dir,
+            **kwargs,
         )
     )
     return agent
 
 
 # Example usage
-if __name__ == "__main__":
+def main() -> None:
+    """Entry point for the tom-agent command."""
 
-    async def main() -> None:
+    async def async_main() -> None:
         # Create ToM agent
         agent = await create_tom_agent()
 
@@ -474,7 +489,9 @@ if __name__ == "__main__":
             user_context, instruction, user_msg_context=""
         )
 
-        print(f"✓ Generated {len(instruction_recommendations)} instruction recommendations")
+        print(
+            f"✓ Generated {len(instruction_recommendations)} instruction recommendations"
+        )
 
         if instruction_recommendations:
             print("\nInstruction Improvements:")
@@ -484,4 +501,8 @@ if __name__ == "__main__":
         else:
             print("❌ No instruction recommendations generated")
 
-    asyncio.run(main())
+    asyncio.run(async_main())
+
+
+if __name__ == "__main__":
+    main()

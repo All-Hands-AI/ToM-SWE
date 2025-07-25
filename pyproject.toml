@@ -3,40 +3,29 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "user-research-analysis"
+name = "tom-swe"
 version = "1.0.0"
-description = "User interaction analysis and Theory of Mind modeling for coding assistants"
+description = "Theory of Mind modeling for Software Engineering assistants"
 authors = [
     {name = "Research Team"}
 ]
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.12, <3.13"
+requires-python = ">=3.10"
 dependencies = [
     "pandas>=2.0.0",
     "numpy>=1.24.0",
     "litellm>=1.0.0",
-    "nltk>=3.8.0",
-    "scikit-learn>=1.3.0",
-    "matplotlib>=3.7.0",
-    "seaborn>=0.12.0",
-    "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
     "json-repair>=0.1.0",
+    "python-dotenv>=1.0.0",
     "rich>=13.0.0",
-    "Flask==2.3.3",
-    "Werkzeug==2.3.7",
     "typing-extensions>=4.0.0",
-    "aiofiles>=23.0.0",
-    "pytest-asyncio>=1.0.0",
-    "wordcloud>=1.9.4",
-    # RAG Agent dependencies
     "tqdm>=4.65.0",
     # API dependencies
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
     "httpx>=0.25.0",
-    "pre-commit>=4.2.0",
 ]
 
 [project.optional-dependencies]
@@ -51,105 +40,10 @@ dev = [
 ]
 
 [project.scripts]
-tom-analyze = "tom_swe.tom_module:main"
-tom-test = "tom_swe.test_tom_module:test_tom_module"
-tom-config = "configure_llm:main"
-user-analysis = "user_interaction_analysis:main"
+tom-agent = "tom_swe.tom_agent:main"
+tom-config = "tom_swe.utils.configure_llm:main"
 rag-agent = "tom_swe.rag_module:main"
 tom-api = "tom_swe.api.server:main"
 
-[tool.uv]
-dev-dependencies = [
-    "pytest>=7.0.0",
-    "black>=22.0.0",
-    "isort>=5.0.0",
-    "mypy>=1.0.0",
-    "pytest-cov>=6.2.1",
-]
-
-[tool.black]
-line-length = 100
-target-version = ['py38']
-
-[tool.isort]
-profile = "black"
-line_length = 100
-
 [tool.hatch.build.targets.wheel]
 packages = ["tom_swe"]
-
-[tool.mypy]
-python_version = "3.8"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false
-ignore_missing_imports = true
-exclude = [
-    'calvin/.*',
-    'xingyao/.*',
-    '\.openhands/.*',
-]
-
-[[tool.mypy.overrides]]
-module = [
-    'tom_module.*',
-    'visualization.*',
-    'utils.*',
-]
-ignore_missing_imports = true
-
-[tool.ruff]
-# Exclude a variety of commonly ignored directories.
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
-]
-
-# Same as Black.
-line-length = 100
-
-# Assume Python 3.8
-target-version = "py38"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "B", "C4", "UP", "PL", "RUF"]
-ignore = ["E501", "PLR0912", "PLR2004"]
-fixable = ["ALL"]
-unfixable = []
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-
-[tool.ruff.lint.isort]
-known-first-party = ["tom_swe"]
-
-[tool.ruff.lint.mccabe]
-max-complexity = 10
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py", "*_test.py"]
-python_functions = ["test_*"]
-addopts = [
-    "-v",
-    "--tb=short",
-    "--disable-warnings",
-]
-asyncio_mode = "auto"
