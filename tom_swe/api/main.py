@@ -31,7 +31,11 @@ logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 logger = logging.getLogger(__name__)
 
 # Ensure all tom_swe loggers use the same level
-for logger_name in ["tom_swe.generation_utils.generate", "tom_swe.tom_agent", "tom_swe.rag_module"]:
+for logger_name in [
+    "tom_swe.generation_utils.generate",
+    "tom_swe.tom_agent",
+    "tom_swe.rag_module",
+]:
     logging.getLogger(logger_name).setLevel(getattr(logging, log_level, logging.INFO))
 
 
@@ -106,12 +110,15 @@ async def health_check() -> HealthResponse:
     return HealthResponse(
         status="healthy",
         version="2.0.0",
-        tom_agent_ready=hasattr(app.state, "tom_agent") and app.state.tom_agent is not None,
+        tom_agent_ready=hasattr(app.state, "tom_agent")
+        and app.state.tom_agent is not None,
     )
 
 
 @app.post("/propose_instructions", response_model=ProposeInstructionsResponse)
-async def propose_instructions(request: ProposeInstructionsRequest) -> ProposeInstructionsResponse:
+async def propose_instructions(
+    request: ProposeInstructionsRequest,
+) -> ProposeInstructionsResponse:
     """
     Get improved, personalized instructions based on user context and preferences.
     """
@@ -124,14 +131,9 @@ async def propose_instructions(request: ProposeInstructionsRequest) -> ProposeIn
     try:
         logger.info(f"Generating instruction improvements for user {request.user_id}")
 
-        # Analyze user context and generate improved instructions
-        user_context = await app.state.tom_agent.analyze_user_context(
+        # Generate improved instructions
+        recommendation = app.state.tom_agent.propose_instructions(
             user_id=request.user_id,
-            current_query=request.context,
-        )
-
-        recommendations = await app.state.tom_agent.propose_instructions(
-            user_context=user_context,
             original_instruction=request.original_instruction,
             user_msg_context=request.context,
         )
@@ -139,9 +141,9 @@ async def propose_instructions(request: ProposeInstructionsRequest) -> ProposeIn
         return ProposeInstructionsResponse(
             user_id=request.user_id,
             original_instruction=request.original_instruction,
-            recommendations=recommendations,
+            recommendations=[recommendation],
             success=True,
-            message=f"Generated {len(recommendations)} instruction recommendations",
+            message="Generated instruction recommendation",
         )
 
     except Exception as e:

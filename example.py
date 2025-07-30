@@ -10,18 +10,17 @@ Requirements:
 - Run with: uv run python example.py
 """
 
-import asyncio
 import os
 
 from dotenv import load_dotenv
 
-from tom_swe.tom_agent import create_tom_agent
+from tom_swe.tom_agent import ToMAgent, ToMAgentConfig
 
 # Load environment variables
 load_dotenv()
 
 
-async def main():
+def main():
     """Demonstrate the propose_instructions function."""
     print("🤖 ToM Agent - Propose Instructions Example")
     print("=" * 50)
@@ -34,50 +33,37 @@ async def main():
     try:
         # Initialize ToM Agent
         print("\n1. Initializing ToM Agent...")
-        agent = await create_tom_agent(
+        config = ToMAgentConfig(
             processed_data_dir="./data/processed_data",
             user_model_dir="./data/user_model",
-            enable_rag=True,
+            enable_rag=False,
         )
+        agent = ToMAgent(config)
         print("✅ Agent initialized successfully")
 
-        # Test cases to demonstrate the function
-        test_cases = [
-            {
-                "user_id": "example_user",
-                "instruction": "Fix my code",
-                "context": "User is working on a Python web application",
-            },
-            {
-                "user_id": "debug_user",
-                "instruction": "My function doesn't work",
-                "context": "User has been debugging for 2 hours",
-            },
-        ]
+        # Example instruction to improve
+        user_id = "default_user"  # Use default_user for demo
+        instruction = "Fix my code"
+        context = "User is working on a Python web application"
 
-        # Run examples
-        for i, test in enumerate(test_cases, 1):
-            print(f"\n{i + 1}. Testing: '{test['instruction']}'")
-            print(f"   User: {test['user_id']}")
-            print(f"   Context: {test['context']}")
+        print(f"\n2. Testing instruction: '{instruction}'")
+        print(f"   User: {user_id}")
+        print(f"   Context: {context}")
 
-            # Analyze user context
-            user_context = await agent.analyze_user_context(test["user_id"], test["instruction"])
+        # Get improved instructions
+        recommendation = agent.propose_instructions(
+            user_id=user_id,
+            original_instruction=instruction,
+            user_msg_context=context,
+        )
 
-            # Get improved instructions
-            recommendations = await agent.propose_instructions(
-                user_context=user_context,
-                original_instruction=test["instruction"],
-                user_msg_context=test["context"],
-            )
-
-            # Show results
-            if recommendations:
-                rec = recommendations[0]
-                print(f"   ✅ Confidence: {rec.confidence_score:.0%}")
-                print(f"   📝 Improved: {rec.improved_instruction[:100]}...")
-            else:
-                print("   ❌ No recommendations generated")
+        # Show results
+        if recommendation:
+            rec = recommendation
+            print(f"   ✅ Confidence: {rec.confidence_score:.0%}")
+            print(f"   📝 Improved instruction:\n{rec.improved_instruction}")
+        else:
+            print("   ❌ No recommendations generated")
 
         print("\n🏁 Demo completed!")
 
@@ -87,4 +73,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
