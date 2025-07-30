@@ -15,7 +15,6 @@ Key Features:
 5. Integration with existing ToM and RAG infrastructure
 """
 
-import asyncio
 import logging
 import os
 import time
@@ -542,7 +541,7 @@ Please generate suggestions to help the **agent** (note that you are giving sugg
 
 
 # Convenience function for quick access
-async def create_tom_agent(
+def create_tom_agent(
     processed_data_dir: str = "./data/processed_data",
     user_model_dir: str = "./data/user_model",
     **kwargs: Any,
@@ -566,42 +565,3 @@ async def create_tom_agent(
         )
     )
     return agent
-
-
-# Example usage
-def main() -> None:
-    """Entry point for the tom-agent command."""
-
-    async def async_main() -> None:
-        # Create ToM agent
-        agent = await create_tom_agent()
-
-        # Test user and instruction
-        user_id = "20d03f52-abb6-4414-b024-67cc89d53e12"
-        instruction = "Hi hiiiiiii"
-
-        print(f"Testing ToM Agent with user: {user_id}")
-        print(f"Original instruction: '{instruction}'")
-        print("=" * 60)
-
-        # Test propose_instructions specifically
-        print("\n1. Testing propose_instructions...")
-        instruction_recommendation = agent.propose_instructions(
-            user_id, instruction, user_msg_context=""
-        )
-
-        print("✓ Generated instruction recommendation")
-
-        if instruction_recommendation:
-            print("\nInstruction Improvement:")
-            print(
-                f"Improved instruction:\n{instruction_recommendation.improved_instruction}"
-            )
-        else:
-            print("❌ No instruction recommendation generated")
-
-    asyncio.run(async_main())
-
-
-if __name__ == "__main__":
-    main()
