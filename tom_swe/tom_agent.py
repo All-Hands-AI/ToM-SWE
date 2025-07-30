@@ -272,7 +272,10 @@ class ToMAgent:
             user_context = self._analyze_user_context(user_id, original_instruction)
 
         # Get relevant user behavior from RAG (if enabled) - make this sync
-        relevant_behavior = self._get_relevant_behavior_sync(original_instruction)
+        if self.enable_rag:
+            relevant_behavior = self._get_relevant_behavior_sync(original_instruction)
+        else:
+            relevant_behavior = ""
 
         # Build prompt for instruction improvement
         prompt = self._build_better_instruction_prompt(
