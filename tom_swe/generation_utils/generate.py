@@ -4,7 +4,6 @@ This module provides an LLMClient class that encapsulates configuration
 and provides both async and sync methods for structured LLM calls.
 """
 
-import asyncio
 import logging
 import os
 from dataclasses import dataclass
@@ -99,9 +98,9 @@ class LLMClient:
         }
 
         if self.config.api_key:
-            completion_args["api_key"] = self.config.api_key
+            completion_args["api_key"] = str(self.config.api_key)
         if self.config.api_base:
-            completion_args["api_base"] = self.config.api_base
+            completion_args["api_base"] = str(self.config.api_base)
 
         response = await acompletion(**completion_args)
         reformatted_output = response.choices[0].message.content
@@ -147,9 +146,9 @@ class LLMClient:
 
         # Add optional parameters
         if self.config.api_key:
-            completion_args["api_key"] = self.config.api_key
+            completion_args["api_key"] = str(self.config.api_key)
         if self.config.api_base:
-            completion_args["api_base"] = self.config.api_base
+            completion_args["api_base"] = str(self.config.api_base)
 
         # Call LLM
         response = await acompletion(**completion_args)
@@ -225,9 +224,9 @@ class LLMClient:
 
         # Add optional parameters
         if self.config.api_key:
-            completion_args["api_key"] = self.config.api_key
+            completion_args["api_key"] = str(self.config.api_key)
         if self.config.api_base:
-            completion_args["api_base"] = self.config.api_base
+            completion_args["api_base"] = str(self.config.api_base)
 
         response = completion(**completion_args)
 
@@ -275,16 +274,8 @@ class LLMClient:
                 if self.config.api_base:
                     fallback_completion_args["api_base"] = self.config.api_base
 
-                # Call fallback model synchronously
-                try:
-                    loop = asyncio.get_running_loop()
-                    fallback_response = asyncio.run_coroutine_threadsafe(
-                        acompletion(**fallback_completion_args), loop
-                    ).result()
-                except RuntimeError:
-                    fallback_response = asyncio.run(
-                        acompletion(**fallback_completion_args)
-                    )
+                # Call fallback model synchronously using completion (not acompletion)
+                fallback_response = completion(**fallback_completion_args)
 
                 reformatted_output = fallback_response.choices[0].message.content
                 assert isinstance(reformatted_output, str)

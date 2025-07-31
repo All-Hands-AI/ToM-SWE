@@ -275,9 +275,9 @@ class UserMentalStateAnalyzer:
 
             result = await self.llm_client.call_structured_async(
                 prompt=prompt,
+                output_type=response_format,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                output_type=response_format,
             )
             return str(result) if result is not None else None
 
