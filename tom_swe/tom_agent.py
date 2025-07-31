@@ -201,50 +201,6 @@ class ToMAgent:
             mental_state_summary=mental_state_summary,
         )
 
-    async def _call_llm_structured(
-        self,
-        prompt: str,
-        output_type: Any,
-        temperature: float = 0.3,
-    ) -> Optional[Any]:
-        """Call the LLM with structured output using LLMClient."""
-        if not self.api_key:
-            logger.error("LLM API key not configured")
-            return None
-
-        try:
-            result = await self.llm_client.call_structured(
-                prompt=prompt,
-                output_type=output_type,
-                temperature=temperature,
-            )
-            return result
-        except Exception as e:
-            logger.error(f"Error calling LLM with structured output: {e}")
-            return None
-
-    async def _call_llm_simple(
-        self,
-        prompt: str,
-        temperature: float = 0.3,
-        max_tokens: int = 1024,
-    ) -> Optional[str]:
-        """Call the LLM for simple text generation."""
-        if not self.api_key:
-            logger.error("LLM API key not configured")
-            return None
-
-        try:
-            result = await self.llm_client.call_simple(
-                prompt=prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            return result
-        except Exception as e:
-            logger.error(f"Error calling LLM: {e}")
-            return None
-
     def propose_instructions(
         self,
         user_id: str,
@@ -286,7 +242,7 @@ class ToMAgent:
         # DEBUG: Check prompt length before LLM call
         self._debug_large_prompt(prompt, user_context, relevant_behavior)
 
-        result = self._call_llm_structured_sync(
+        result = self.llm_client.call_structured_sync(
             prompt,
             output_type=InstructionImprovementResponse,
             temperature=0.2,
@@ -447,28 +403,6 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
                 )
             logger.info("RAG agent initialized successfully")
         return self._rag_agent
-
-    def _call_llm_structured_sync(
-        self,
-        prompt: str,
-        output_type: Any,
-        temperature: float = 0.3,
-    ) -> Optional[Any]:
-        """Call the LLM with structured output (synchronous)."""
-        if not self.api_key:
-            logger.error("LLM API key not configured")
-            return None
-
-        try:
-            result = self.llm_client.call_structured_sync(
-                prompt=prompt,
-                output_type=output_type,
-                temperature=temperature,
-            )
-            return result
-        except Exception as e:
-            logger.error(f"Error calling LLM with structured output: {e}")
-            return None
 
     def _build_better_instruction_prompt(
         self,

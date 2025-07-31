@@ -273,10 +273,11 @@ class UserMentalStateAnalyzer:
                     "response_format parameter is not yet supported by LLMClient"
                 )
 
-            result = await self.llm_client.call_simple(
+            result = await self.llm_client.call_structured_async(
                 prompt=prompt,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                output_type=response_format,
             )
             return str(result) if result is not None else None
 
