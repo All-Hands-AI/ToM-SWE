@@ -33,8 +33,7 @@ from tom_swe.database import (
 )
 from tom_swe.generation_utils.generate import (
     LLMConfig,
-    call_llm_simple,
-    call_llm_structured,
+    LLMClient,
 )
 from tom_swe.rag_module import RAGAgent, create_rag_agent
 from tom_swe.tom_module import UserMentalStateAnalyzer
@@ -69,6 +68,8 @@ class ToMAgentConfig:
     user_model_dir: str = "./data/user_model"
     llm_model: Optional[str] = None
     enable_rag: bool = True
+    api_key: Optional[str] = None
+    api_base: Optional[str] = None
 
 
 @dataclass
@@ -102,9 +103,21 @@ class ToMAgent:
         self.llm_model = config.llm_model or DEFAULT_LLM_MODEL
         self.enable_rag = config.enable_rag
 
-        # Initialize ToM analyzer
+        # LLM configuration - use config values if provided, otherwise fallback to env vars
+        self.api_key = config.api_key or LITELLM_API_KEY
+        self.api_base = config.api_base or LITELLM_BASE_URL
+
+        # Create LLM client with our configuration
+        llm_config = LLMConfig(
+            model=self.llm_model,
+            api_key=self.api_key,
+            api_base=self.api_base,
+        )
+        self.llm_client = LLMClient(llm_config)
+
+        # Initialize ToM analyzer with LLM client
         self.tom_analyzer = UserMentalStateAnalyzer(
-            processed_data_dir=self.processed_data_dir, model=self.llm_model
+            processed_data_dir=self.processed_data_dir, llm_client=self.llm_client
         )
 
         # RAG agent will be initialized when needed (only if RAG is enabled)
@@ -194,22 +207,16 @@ class ToMAgent:
         output_type: Any,
         temperature: float = 0.3,
     ) -> Optional[Any]:
-        """Call the LLM with structured output using new generation utilities."""
-        if not LITELLM_API_KEY:
+        """Call the LLM with structured output using LLMClient."""
+        if not self.api_key:
             logger.error("LLM API key not configured")
             return None
 
         try:
-            config = LLMConfig(
-                model=self.llm_model,
-                temperature=temperature,
-                api_key=LITELLM_API_KEY,
-                api_base=LITELLM_BASE_URL,
-            )
-            result = await call_llm_structured(
+            result = await self.llm_client.call_structured(
                 prompt=prompt,
                 output_type=output_type,
-                config=config,
+                temperature=temperature,
             )
             return result
         except Exception as e:
@@ -223,21 +230,15 @@ class ToMAgent:
         max_tokens: int = 1024,
     ) -> Optional[str]:
         """Call the LLM for simple text generation."""
-        if not LITELLM_API_KEY:
+        if not self.api_key:
             logger.error("LLM API key not configured")
             return None
 
         try:
-            config = LLMConfig(
-                model=self.llm_model,
+            result = await self.llm_client.call_simple(
+                prompt=prompt,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                api_key=LITELLM_API_KEY,
-                api_base=LITELLM_BASE_URL,
-            )
-            result = await call_llm_simple(
-                prompt=prompt,
-                config=config,
             )
             return result
         except Exception as e:
@@ -454,38 +455,16 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
         temperature: float = 0.3,
     ) -> Optional[Any]:
         """Call the LLM with structured output (synchronous)."""
-        if not LITELLM_API_KEY:
+        if not self.api_key:
             logger.error("LLM API key not configured")
             return None
 
         try:
-            config = LLMConfig(
-                model=self.llm_model,
+            result = self.llm_client.call_structured_sync(
+                prompt=prompt,
+                output_type=output_type,
                 temperature=temperature,
-                api_key=LITELLM_API_KEY,
-                api_base=LITELLM_BASE_URL,
             )
-            import asyncio
-
-            try:
-                loop = asyncio.get_running_loop()
-                result = asyncio.run_coroutine_threadsafe(
-                    call_llm_structured(
-                        prompt=prompt,
-                        output_type=output_type,
-                        config=config,
-                    ),
-                    loop,
-                ).result()
-            except RuntimeError:
-                # No event loop running
-                result = asyncio.run(
-                    call_llm_structured(
-                        prompt=prompt,
-                        output_type=output_type,
-                        config=config,
-                    )
-                )
             return result
         except Exception as e:
             logger.error(f"Error calling LLM with structured output: {e}")
@@ -547,6 +526,10 @@ Please generate suggestions to help the **agent** (note that you are giving sugg
 def create_tom_agent(
     processed_data_dir: str = "./data/processed_data",
     user_model_dir: str = "./data/user_model",
+    llm_model: Optional[str] = None,
+    api_key: Optional[str] = None,
+    api_base: Optional[str] = None,
+    enable_rag: bool = True,
     **kwargs: Any,
 ) -> ToMAgent:
     """
@@ -555,16 +538,23 @@ def create_tom_agent(
     Args:
         processed_data_dir: Directory containing processed user data
         user_model_dir: Directory containing user model data
+        llm_model: LLM model to use (defaults to DEFAULT_LLM_MODEL)
+        api_key: API key for LLM service (defaults to LITELLM_API_KEY env var)
+        api_base: Base URL for LLM service (defaults to LITELLM_BASE_URL env var)
+        enable_rag: Whether to enable RAG functionality
         **kwargs: Additional arguments for ToMAgent
 
     Returns:
         Initialized ToMAgent
     """
-    agent = ToMAgent(
-        config=ToMAgentConfig(
-            processed_data_dir=processed_data_dir,
-            user_model_dir=user_model_dir,
-            **kwargs,
-        )
+    config = ToMAgentConfig(
+        processed_data_dir=processed_data_dir,
+        user_model_dir=user_model_dir,
+        llm_model=llm_model,
+        api_key=api_key,
+        api_base=api_base,
+        enable_rag=enable_rag,
+        **kwargs,
     )
+    agent = ToMAgent(config=config)
     return agent

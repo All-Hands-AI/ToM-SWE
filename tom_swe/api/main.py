@@ -9,7 +9,7 @@ and next action suggestions for SWE agents.
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Optional
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, status
@@ -39,14 +39,14 @@ for logger_name in [
     logging.getLogger(logger_name).setLevel(getattr(logging, log_level, logging.INFO))
 
 
-async def initialize_tom_agent() -> ToMAgent | None:
+async def initialize_tom_agent() -> Optional[ToMAgent]:
     """Initialize the ToM agent."""
     processed_data_dir = os.getenv("TOM_PROCESSED_DATA_DIR", "./data/processed_data")
     user_model_dir = os.getenv("TOM_USER_MODEL_DIR", "./data/user_model")
     enable_rag = os.getenv("TOM_ENABLE_RAG", "true").lower() in ("true", "1", "yes")
 
     try:
-        agent = await create_tom_agent(
+        agent = create_tom_agent(
             processed_data_dir=processed_data_dir,
             user_model_dir=user_model_dir,
             enable_rag=enable_rag,

@@ -204,7 +204,9 @@ def generate_behavior_report(behavior_data: Dict[str, Any]) -> str:
     return report
 
 
-def save_behavior_visualization(behavior_data: Dict[str, Any], output_path: str) -> None:
+def save_behavior_visualization(
+    behavior_data: Dict[str, Any], output_path: str
+) -> None:
     """Save behavior visualization to file.
 
     Args:

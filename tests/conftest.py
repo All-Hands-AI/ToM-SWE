@@ -123,7 +123,8 @@ def analyzer_with_temp_dir(temp_dir: str) -> tuple[UserMentalStateAnalyzer, str]
 
 @pytest.fixture
 def user_file_setup(
-    analyzer_with_temp_dir: tuple[UserMentalStateAnalyzer, str], sample_user_data: Dict[str, Any]
+    analyzer_with_temp_dir: tuple[UserMentalStateAnalyzer, str],
+    sample_user_data: Dict[str, Any],
 ) -> tuple[UserMentalStateAnalyzer, str, str]:
     """Set up a user file with sample data."""
     analyzer, temp_dir = analyzer_with_temp_dir

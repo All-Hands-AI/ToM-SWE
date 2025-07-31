@@ -19,14 +19,16 @@ import os
 import warnings
 from collections import Counter
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import aiofiles  # type: ignore
 import litellm
 
+if TYPE_CHECKING:
+    from tom_swe.generation_utils.generate import LLMClient
+
 # Third-party imports
 from dotenv import load_dotenv
-from litellm import acompletion
 from rich import print
 
 from .database import (
@@ -51,7 +53,9 @@ litellm.set_verbose = False
 # Configure LLM proxy settings
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
 LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
-DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514")
+DEFAULT_LLM_MODEL = os.getenv(
+    "DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514"
+)
 
 # Constants
 MIN_CLARIFICATION_SEQUENCE = 2
@@ -72,13 +76,30 @@ class UserMentalStateAnalyzer:
     def __init__(
         self,
         processed_data_dir: str = "./data/processed_data",
+        llm_client: Optional["LLMClient"] = None,
         model: Optional[str] = None,
         session_batch_size: int = 3,
     ) -> None:
         """Initialize the analyzer with configuration and validate setup."""
         self.processed_data_dir = processed_data_dir
-        self.model = model or DEFAULT_LLM_MODEL
         self.session_batch_size = session_batch_size
+
+        # Use provided LLM client or create one from legacy parameters
+        if llm_client is not None:
+            self.llm_client = llm_client
+            self.model = llm_client.config.model
+        else:
+            # Legacy initialization - create LLMClient from model parameter
+            from tom_swe.generation_utils.generate import LLMConfig, LLMClient
+
+            self.model = model or DEFAULT_LLM_MODEL
+            config = LLMConfig(
+                model=self.model,
+                api_key=LITELLM_API_KEY,
+                api_base=LITELLM_BASE_URL,
+            )
+            self.llm_client = LLMClient(config)
+
         self._validate_and_setup_configuration()
 
     # ===================================================================
@@ -89,7 +110,9 @@ class UserMentalStateAnalyzer:
         """Validate and setup LLM configuration."""
         if not LITELLM_API_KEY:
             print("Warning: LITELLM_API_KEY not set. LLM analysis will fail.")
-            print("Please set LITELLM_API_KEY environment variable or create a .env file.")
+            print(
+                "Please set LITELLM_API_KEY environment variable or create a .env file."
+            )
 
         # Set up litellm configuration if we have the required settings
         if LITELLM_API_KEY and LITELLM_BASE_URL:
@@ -121,14 +144,18 @@ class UserMentalStateAnalyzer:
         user_data = await self.load_user_data(user_id)
         return list(user_data.keys()) if user_data else []
 
-    async def load_session_data(self, user_id: str, session_id: str) -> Optional[Dict[str, Any]]:
+    async def load_session_data(
+        self, user_id: str, session_id: str
+    ) -> Optional[Dict[str, Any]]:
         """Load specific session data for a user."""
         user_data = await self.load_user_data(user_id)
         if not user_data:
             return None
         return user_data.get(session_id)
 
-    def load_studio_results_metadata(self, data_dir: str = "./data") -> Dict[str, Dict[str, Any]]:
+    def load_studio_results_metadata(
+        self, data_dir: str = "./data"
+    ) -> Dict[str, Dict[str, Any]]:
         """
         Load metadata from studio_results_*.csv files.
         Returns a dictionary with conversation_id as key and metadata as value.
@@ -153,7 +180,9 @@ class UserMentalStateAnalyzer:
                             metadata[conversation_id] = {
                                 "conversation_id": conversation_id,
                                 "github_user_id": row.get("github_user_id", ""),
-                                "selected_repository": row.get("selected_repository", ""),
+                                "selected_repository": row.get(
+                                    "selected_repository", ""
+                                ),
                                 "title": row.get("title", ""),
                                 "last_updated_at": row.get("last_updated_at", ""),
                                 "created_at": row.get("created_at", ""),
@@ -228,35 +257,28 @@ class UserMentalStateAnalyzer:
         response_format: Optional[Any] = None,
     ) -> Optional[str]:
         """
-        Call the LLM with error handling and retries using async.
+        Call the LLM with error handling and retries using LLMClient.
         """
-        if not LITELLM_API_KEY:
+        if not self.llm_client.config.api_key:
             print("LLM API key not configured. Skipping LLM analysis.")
             return None
 
         try:
-            # Prepare the completion call with proxy configuration
-            completion_args = {
-                "model": self.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": temperature,
-                "response_format": response_format,
-            }
+            # TODO: Handle response_format parameter - LLMClient doesn't support it yet
+            if response_format is not None:
+                import logging
 
-            # Add max_tokens if specified
-            if max_tokens:
-                completion_args["max_tokens"] = max_tokens
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    "response_format parameter is not yet supported by LLMClient"
+                )
 
-            # Add API key and base URL if available
-            if LITELLM_API_KEY:
-                completion_args["api_key"] = LITELLM_API_KEY
-            if LITELLM_BASE_URL:
-                completion_args["api_base"] = LITELLM_BASE_URL
-
-            # Use native async completion
-            response = await acompletion(**completion_args)
-            content: str = response.choices[0].message.content
-            return content.strip()
+            result = await self.llm_client.call_simple(
+                prompt=prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            return str(result) if result is not None else None
 
         except Exception as e:
             print(f"Error calling LLM ({self.model}): {e}")
@@ -311,13 +333,21 @@ Analyze this user message to a coding assistant across four dimensions. Provide 
 
         # Prepare data for LLM prompt
         insights_text = (
-            "; ".join(user_insights) if user_insights else "No specific insights available"
+            "; ".join(user_insights)
+            if user_insights
+            else "No specific insights available"
         )
         intent_summary = ", ".join(
-            [f"{intent}: {count}" for intent, count in profile.intent_distribution.items()]
+            [
+                f"{intent}: {count}"
+                for intent, count in profile.intent_distribution.items()
+            ]
         )
         emotion_summary = ", ".join(
-            [f"{emotion}: {count}" for emotion, count in profile.emotion_distribution.items()]
+            [
+                f"{emotion}: {count}"
+                for emotion, count in profile.emotion_distribution.items()
+            ]
         )
         all_preferences_text = (
             ", ".join(set(all_preferences))
@@ -326,9 +356,9 @@ Analyze this user message to a coding assistant across four dimensions. Provide 
         )
 
         # Use Pydantic parser for structured output
-        parser: PydanticOutputParser[UserDescriptionAndPreferences] = PydanticOutputParser(
-            pydantic_object=UserDescriptionAndPreferences
-        )
+        parser: PydanticOutputParser[
+            UserDescriptionAndPreferences
+        ] = PydanticOutputParser(pydantic_object=UserDescriptionAndPreferences)
         format_instructions = parser.get_format_instructions()
 
         # Single LLM call for both description and preferences
@@ -346,7 +376,9 @@ Observed Preferences: {all_preferences_text}
 """
 
         # Make single LLM call with structured response format
-        result = await self.call_llm(combined_prompt, response_format=parser.pydantic_object)
+        result = await self.call_llm(
+            combined_prompt, response_format=parser.pydantic_object
+        )
         if not result:
             return UserDescriptionAndPreferences(
                 description="New user with no session history yet.", preferences=[]
@@ -399,7 +431,9 @@ Observed Preferences: {all_preferences_text}
         if not session_data:
             return None
 
-        user_typed_messages = self.extract_user_typed_messages_from_session(session_data)
+        user_typed_messages = self.extract_user_typed_messages_from_session(
+            session_data
+        )
         if not user_typed_messages:
             return [], []
 
@@ -440,10 +474,14 @@ Observed Preferences: {all_preferences_text}
                 all_preferences.extend(a.preference)
 
         # Count clarification requests
-        clarification_count = sum(1 for a in analyses_list if a.should_ask_clarification)
+        clarification_count = sum(
+            1 for a in analyses_list if a.should_ask_clarification
+        )
 
         # Aggregate user modeling insights
-        user_insights = [a.user_modeling for a in analyses_list if a.user_modeling.strip()]
+        user_insights = [
+            a.user_modeling for a in analyses_list if a.user_modeling.strip()
+        ]
         user_modeling_summary = "; ".join(user_insights[:3])  # Take first 3
 
         return SessionSummary(
@@ -459,7 +497,9 @@ Observed Preferences: {all_preferences_text}
             session_end=session_metadata.get("convo_end", ""),
         )
 
-    def calculate_session_metrics(self, analyses_list: List[UserMessageAnalysis]) -> Dict[str, Any]:
+    def calculate_session_metrics(
+        self, analyses_list: List[UserMessageAnalysis]
+    ) -> Dict[str, Any]:
         """Calculate various metrics for a session."""
         if not analyses_list:
             return {}
@@ -470,7 +510,9 @@ Observed Preferences: {all_preferences_text}
             "emotion_distribution": dict(
                 Counter(emotion for a in analyses_list for emotion in a.emotions)
             ),
-            "clarification_ratio": sum(1 for a in analyses_list if a.should_ask_clarification)
+            "clarification_ratio": sum(
+                1 for a in analyses_list if a.should_ask_clarification
+            )
             / len(analyses_list),
             "unique_preferences": len(
                 {pref for a in analyses_list for pref in a.preference if pref != "none"}
@@ -564,9 +606,15 @@ Observed Preferences: {all_preferences_text}
         self.update_user_profile_with_session(analysis)
 
         # Generate overall description using LLM
-        description_and_preferences = await self.generate_overall_user_description(analysis)
-        analysis.user_profile.overall_description = description_and_preferences.description
-        analysis.user_profile.preference_summary = description_and_preferences.preferences
+        description_and_preferences = await self.generate_overall_user_description(
+            analysis
+        )
+        analysis.user_profile.overall_description = (
+            description_and_preferences.description
+        )
+        analysis.user_profile.preference_summary = (
+            description_and_preferences.preferences
+        )
 
         # Save updated analysis
         overall_path = os.path.join(base_dir, "user_model_overall", f"{user_id}.json")
@@ -654,7 +702,9 @@ Observed Preferences: {all_preferences_text}
         Returns list of successfully processed session summaries.
         """
 
-        async def process_single_session_with_metadata(session_id: str) -> Optional[SessionSummary]:
+        async def process_single_session_with_metadata(
+            session_id: str,
+        ) -> Optional[SessionSummary]:
             session_metadata = studio_metadata.get(session_id, {})
             if session_metadata:
                 print(
@@ -668,7 +718,10 @@ Observed Preferences: {all_preferences_text}
             )
 
         # Process all sessions in the batch concurrently
-        tasks = [process_single_session_with_metadata(session_id) for session_id in session_batch]
+        tasks = [
+            process_single_session_with_metadata(session_id)
+            for session_id in session_batch
+        ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Collect successful session summaries

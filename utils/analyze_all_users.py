@@ -31,7 +31,9 @@ def check_session_already_processed(
     user_id: str, session_id: str, base_dir: str = "./data/user_model"
 ) -> bool:
     """Check if a session has already been processed by looking for the detailed analysis file."""
-    detailed_file = os.path.join(base_dir, "user_model_detailed", user_id, f"{session_id}.json")
+    detailed_file = os.path.join(
+        base_dir, "user_model_detailed", user_id, f"{session_id}.json"
+    )
     return os.path.exists(detailed_file)
 
 
@@ -125,7 +127,9 @@ async def process_all_user_sessions(
 
     # Update user profile once with all session summaries
     if all_session_summaries:
-        await analyzer.save_updated_user_profile(user_id, all_session_summaries, base_dir)
+        await analyzer.save_updated_user_profile(
+            user_id, all_session_summaries, base_dir
+        )
 
     total_sessions = len(session_ids)
     success_count = len(all_session_summaries)
@@ -140,7 +144,9 @@ def setup_argument_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument("--user_id", type=str, help="Analyze specific user ID")
-    parser.add_argument("--max_users", type=int, help="Maximum number of users to process")
+    parser.add_argument(
+        "--max_users", type=int, help="Maximum number of users to process"
+    )
     parser.add_argument(
         "--processed_data_dir",
         type=str,
@@ -166,7 +172,10 @@ def setup_argument_parser() -> argparse.ArgumentParser:
         help="Limit to first N sessions per user (0 = no limit)",
     )
     parser.add_argument(
-        "--session_batch_size", type=int, default=50, help="Batch size for processing sessions"
+        "--session_batch_size",
+        type=int,
+        default=50,
+        help="Batch size for processing sessions",
     )
     return parser
 
@@ -232,7 +241,9 @@ async def process_users(user_ids: List[str], analyzer, args) -> None:
     print_final_summary(user_ids, successful, failed_users)
 
 
-def print_final_summary(user_ids: List[str], successful: int, failed_users: List[str]) -> None:
+def print_final_summary(
+    user_ids: List[str], successful: int, failed_users: List[str]
+) -> None:
     """Print the final analysis summary."""
     print(f"\n{'='*60}")
     print("📊 ANALYSIS SUMMARY")

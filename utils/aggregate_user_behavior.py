@@ -23,7 +23,9 @@ load_dotenv()
 # Configure LLM settings
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
 LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
-DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514")
+DEFAULT_LLM_MODEL = os.getenv(
+    "DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514"
+)
 
 # Constants for magic numbers
 MAX_EXAMPLES_PER_BATCH = 15
@@ -153,11 +155,15 @@ class EnhancedUserBehaviorAnalyzer:
                 )
 
             all_negative_messages[user_id] = user_negative_messages
-            print(f"  Found {len(user_negative_messages)} negative messages for this user")
+            print(
+                f"  Found {len(user_negative_messages)} negative messages for this user"
+            )
 
         return all_negative_messages
 
-    def _extract_from_session(self, session_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _extract_from_session(
+        self, session_data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Extract negative messages from a single session."""
         session_id = session_data.get("session_id", "unknown")
         message_analyses = session_data.get("message_analyses", [])
@@ -220,7 +226,9 @@ class EnhancedUserBehaviorAnalyzer:
                     "overall_description": user_profile.get("overall_description", ""),
                     "preference_summary": user_profile.get("preference_summary", []),
                     "intent_distribution": user_profile.get("intent_distribution", {}),
-                    "emotion_distribution": user_profile.get("emotion_distribution", {}),
+                    "emotion_distribution": user_profile.get(
+                        "emotion_distribution", {}
+                    ),
                     "total_sessions": user_profile.get("total_sessions", 0),
                     "session_preferences": [],
                 }
@@ -230,7 +238,9 @@ class EnhancedUserBehaviorAnalyzer:
                     session_prefs = {
                         "session_id": session.get("session_id", ""),
                         "key_preferences": session.get("key_preferences", []),
-                        "user_modeling_summary": session.get("user_modeling_summary", ""),
+                        "user_modeling_summary": session.get(
+                            "user_modeling_summary", ""
+                        ),
                         "intent_distribution": session.get("intent_distribution", {}),
                         "emotion_distribution": session.get("emotion_distribution", {}),
                     }
@@ -258,7 +268,9 @@ class EnhancedUserBehaviorAnalyzer:
             for msg in messages:
                 all_negative_msgs.append(
                     {
-                        "message": msg["original_message"][:300],  # Truncate for efficiency
+                        "message": msg["original_message"][
+                            :300
+                        ],  # Truncate for efficiency
                         "emotions": msg["negative_emotions"],
                         "intent": msg["intent"],
                         "session_title": msg.get("session_title", "")[:100],  # Truncate
@@ -295,7 +307,9 @@ class EnhancedUserBehaviorAnalyzer:
                 intent_counts[msg["intent"]] = intent_counts.get(msg["intent"], 0) + 1
 
                 # Add message samples
-                if len(batch_summary) < MAX_EXAMPLES_PER_BATCH:  # Limit examples per batch
+                if (
+                    len(batch_summary) < MAX_EXAMPLES_PER_BATCH
+                ):  # Limit examples per batch
                     batch_summary.append(
                         f"'{msg['message'][:150]}...' (emotions: {','.join(msg['emotions'])}, intent: {msg['intent']})"
                     )
@@ -335,7 +349,9 @@ TRIGGERS:
         # Consolidate results from all batches
         return self._consolidate_frustration_analysis(all_analysis_results)
 
-    def _consolidate_frustration_analysis(self, analysis_results: List[str]) -> Dict[str, Any]:
+    def _consolidate_frustration_analysis(
+        self, analysis_results: List[str]
+    ) -> Dict[str, Any]:
         """Consolidate multiple batch analysis results."""
         all_patterns = []
         all_root_causes = []
@@ -379,7 +395,9 @@ TRIGGERS:
             import random
 
             sampled_users = dict(
-                random.sample(list(user_preferences.items()), MAX_USERS_FOR_PREFERENCE_ANALYSIS)
+                random.sample(
+                    list(user_preferences.items()), MAX_USERS_FOR_PREFERENCE_ANALYSIS
+                )
             )
             print(
                 f"Sampling {MAX_USERS_FOR_PREFERENCE_ANALYSIS} users from {len(user_preferences)} for preference analysis"
@@ -407,9 +425,15 @@ TRIGGERS:
                 emotion_summary[emotion] = emotion_summary.get(emotion, 0) + count
 
         # Single comprehensive analysis call
-        top_intents = sorted(intent_summary.items(), key=lambda x: x[1], reverse=True)[:10]
-        top_emotions = sorted(emotion_summary.items(), key=lambda x: x[1], reverse=True)[:10]
-        unique_preferences = list(set(all_preferences))[:20]  # Top 20 unique preferences
+        top_intents = sorted(intent_summary.items(), key=lambda x: x[1], reverse=True)[
+            :10
+        ]
+        top_emotions = sorted(
+            emotion_summary.items(), key=lambda x: x[1], reverse=True
+        )[:10]
+        unique_preferences = list(set(all_preferences))[
+            :20
+        ]  # Top 20 unique preferences
 
         prompt = f"""
 Analyze user preferences and behaviors from {len(user_preferences)} coding assistant users.
@@ -570,7 +594,9 @@ PROACTIVE_ASSISTANCE:
         """Save comprehensive analysis results."""
 
         # Save negative messages analysis
-        negative_file_path = os.path.join(self.output_path, "negative_sentiment_analysis.json")
+        negative_file_path = os.path.join(
+            self.output_path, "negative_sentiment_analysis.json"
+        )
         with open(negative_file_path, "w", encoding="utf-8") as f:
             json.dump(
                 {
@@ -588,7 +614,9 @@ PROACTIVE_ASSISTANCE:
             )
 
         # Save user preferences analysis
-        preferences_file_path = os.path.join(self.output_path, "user_preferences_analysis.json")
+        preferences_file_path = os.path.join(
+            self.output_path, "user_preferences_analysis.json"
+        )
         with open(preferences_file_path, "w", encoding="utf-8") as f:
             json.dump(
                 {
@@ -601,7 +629,9 @@ PROACTIVE_ASSISTANCE:
             )
 
         # Save pattern analysis
-        patterns_file_path = os.path.join(self.output_path, "behavior_patterns_analysis.json")
+        patterns_file_path = os.path.join(
+            self.output_path, "behavior_patterns_analysis.json"
+        )
         with open(patterns_file_path, "w", encoding="utf-8") as f:
             json.dump(
                 {
@@ -622,7 +652,9 @@ PROACTIVE_ASSISTANCE:
 
         print(f"Comprehensive analysis saved to: {self.output_path}")
 
-    async def generate_system_prompt_additions(self, best_practices: Dict[str, Any]) -> str:
+    async def generate_system_prompt_additions(
+        self, best_practices: Dict[str, Any]
+    ) -> str:
         """Generate specific additions for system prompts."""
         print("Generating system prompt additions...")
 
@@ -657,10 +689,14 @@ Format it as a system prompt section that can be directly added to existing prom
         self, analysis_data: AnalysisData, system_prompt_addition: str
     ) -> None:
         """Create a comprehensive summary report."""
-        summary_path = os.path.join(self.output_path, "comprehensive_user_behavior_analysis.md")
+        summary_path = os.path.join(
+            self.output_path, "comprehensive_user_behavior_analysis.md"
+        )
 
         total_users = len(analysis_data.user_preferences)
-        users_with_negative = len([u for u in analysis_data.negative_messages.values() if u])
+        users_with_negative = len(
+            [u for u in analysis_data.negative_messages.values() if u]
+        )
         total_negative_messages = sum(
             len(msgs) for msgs in analysis_data.negative_messages.values()
         )
@@ -676,7 +712,9 @@ Format it as a system prompt section that can be directly added to existing prom
 
             f.write("## Frustration Analysis\n\n")
             f.write("### Common Frustration Patterns\n")
-            for pattern in analysis_data.frustration_analysis.get("frustration_patterns", [])[:10]:
+            for pattern in analysis_data.frustration_analysis.get(
+                "frustration_patterns", []
+            )[:10]:
                 f.write(f"- {pattern}\n")
 
             f.write("\n### Root Causes of Frustration\n")
@@ -689,36 +727,52 @@ Format it as a system prompt section that can be directly added to existing prom
 
             f.write("\n## User Preference Patterns\n\n")
             f.write("### Communication Patterns\n")
-            for pattern in analysis_data.preference_analysis.get("communication_patterns", [])[:10]:
+            for pattern in analysis_data.preference_analysis.get(
+                "communication_patterns", []
+            )[:10]:
                 f.write(f"- {pattern}\n")
 
             f.write("\n### Workflow Preferences\n")
-            for pattern in analysis_data.preference_analysis.get("workflow_preferences", [])[:10]:
+            for pattern in analysis_data.preference_analysis.get(
+                "workflow_preferences", []
+            )[:10]:
                 f.write(f"- {pattern}\n")
 
             f.write("\n### Technical Preferences\n")
-            for pattern in analysis_data.preference_analysis.get("technical_preferences", [])[:10]:
+            for pattern in analysis_data.preference_analysis.get(
+                "technical_preferences", []
+            )[:10]:
                 f.write(f"- {pattern}\n")
 
             f.write("\n## Best Practices for Coding Assistants\n\n")
             f.write("### System Prompt Guidelines\n")
-            for guideline in analysis_data.best_practices.get("system_prompt_guidelines", []):
+            for guideline in analysis_data.best_practices.get(
+                "system_prompt_guidelines", []
+            ):
                 f.write(f"- {guideline}\n")
 
             f.write("\n### Communication Best Practices\n")
-            for practice in analysis_data.best_practices.get("communication_best_practices", []):
+            for practice in analysis_data.best_practices.get(
+                "communication_best_practices", []
+            ):
                 f.write(f"- {practice}\n")
 
             f.write("\n### Workflow Optimization\n")
-            for optimization in analysis_data.best_practices.get("workflow_optimization", []):
+            for optimization in analysis_data.best_practices.get(
+                "workflow_optimization", []
+            ):
                 f.write(f"- {optimization}\n")
 
             f.write("\n### Frustration Prevention\n")
-            for prevention in analysis_data.best_practices.get("frustration_prevention", []):
+            for prevention in analysis_data.best_practices.get(
+                "frustration_prevention", []
+            ):
                 f.write(f"- {prevention}\n")
 
             f.write("\n### Proactive Assistance\n")
-            for assistance in analysis_data.best_practices.get("proactive_assistance", []):
+            for assistance in analysis_data.best_practices.get(
+                "proactive_assistance", []
+            ):
                 f.write(f"- {assistance}\n")
 
             f.write("\n## Recommended System Prompt Addition\n\n")
@@ -748,10 +802,14 @@ Format it as a system prompt section that can be directly added to existing prom
             return
 
         # Analyze frustration patterns
-        frustration_analysis = await self.analyze_frustration_patterns(negative_messages)
+        frustration_analysis = await self.analyze_frustration_patterns(
+            negative_messages
+        )
 
         # Analyze preference patterns
-        preference_analysis = await self.analyze_user_preferences_patterns(user_preferences)
+        preference_analysis = await self.analyze_user_preferences_patterns(
+            user_preferences
+        )
 
         # Generate best practices
         best_practices = await self.generate_best_practices(
@@ -759,7 +817,9 @@ Format it as a system prompt section that can be directly added to existing prom
         )
 
         # Generate system prompt additions
-        system_prompt_addition = await self.generate_system_prompt_additions(best_practices)
+        system_prompt_addition = await self.generate_system_prompt_additions(
+            best_practices
+        )
 
         # Create analysis data container
         analysis_data = AnalysisData(
@@ -776,7 +836,9 @@ Format it as a system prompt section that can be directly added to existing prom
         # Create comprehensive summary
         await self.create_comprehensive_summary(analysis_data, system_prompt_addition)
 
-        print(f"\nComprehensive analysis complete! Results saved to: {self.output_path}")
+        print(
+            f"\nComprehensive analysis complete! Results saved to: {self.output_path}"
+        )
         print("Generated files:")
         print("  - negative_sentiment_analysis.json")
         print("  - user_preferences_analysis.json")
@@ -791,7 +853,9 @@ Format it as a system prompt section that can be directly added to existing prom
         print(
             f"Users with negative experiences: {users_with_negative} ({users_with_negative/len(user_preferences)*100:.1f}%)"
         )
-        print(f"Total negative messages: {sum(len(msgs) for msgs in negative_messages.values()):,}")
+        print(
+            f"Total negative messages: {sum(len(msgs) for msgs in negative_messages.values()):,}"
+        )
 
 
 async def main():

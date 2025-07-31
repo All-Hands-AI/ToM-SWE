@@ -114,12 +114,17 @@ Important formatting requirements:
                 logger.debug(f"Manual JSON fix failed: {e}")
 
         if parsed_data is None:
-            raise ValueError(f"Failed to parse JSON from LLM output: {last_error}") from None
+            raise ValueError(
+                f"Failed to parse JSON from LLM output: {last_error}"
+            ) from None
 
         # Handle nested "properties" structure if present
         if isinstance(parsed_data, dict) and "properties" in parsed_data:
             # Sometimes LLMs return the schema structure instead of data
-            if all(key in parsed_data["properties"] for key in self.pydantic_object.model_fields):
+            if all(
+                key in parsed_data["properties"]
+                for key in self.pydantic_object.model_fields
+            ):
                 parsed_data = parsed_data["properties"]
 
         # Validate with Pydantic

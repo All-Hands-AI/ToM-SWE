@@ -62,7 +62,9 @@ def main() -> None:
     user_model_path = Path(args.user_model_dir)
 
     if not processed_data_path.exists():
-        print(f"Warning: Processed data directory does not exist: {processed_data_path}")
+        print(
+            f"Warning: Processed data directory does not exist: {processed_data_path}"
+        )
         print("Creating directory...")
         processed_data_path.mkdir(parents=True, exist_ok=True)
 

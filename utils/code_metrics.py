@@ -33,7 +33,9 @@ def count_functions(code: str) -> int:
     """
     try:
         tree = ast.parse(code)
-        functions = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
+        functions = [
+            node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+        ]
         return len(functions)
     except SyntaxError:
         # Fall back to regex for invalid Python code
@@ -159,7 +161,12 @@ def calculate_complexity_score(metrics: Dict[str, Any]) -> str:
     # Simple heuristic for complexity
     if lines <= 50 and functions <= 3 and classes <= 1 and cyclomatic_complexity <= 5:
         return "low"
-    elif lines <= 200 and functions <= 10 and classes <= 5 and cyclomatic_complexity <= 15:
+    elif (
+        lines <= 200
+        and functions <= 10
+        and classes <= 5
+        and cyclomatic_complexity <= 15
+    ):
         return "medium"
     else:
         return "high"

@@ -45,7 +45,9 @@ logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 logger = logging.getLogger(__name__)
 
 # LiteLLM configuration
-DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514")
+DEFAULT_LLM_MODEL = os.getenv(
+    "DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514"
+)
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
 LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
 
@@ -54,8 +56,12 @@ LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
 class ChunkingConfig:
     """Configuration for the chunking strategy."""
 
-    target_chunk_tokens: int = 2500  # Target tokens per chunk (optimal for user messages)
-    max_chunk_tokens: int = 3000  # Hard limit per chunk (efficient for user messages + context)
+    target_chunk_tokens: int = (
+        2500  # Target tokens per chunk (optimal for user messages)
+    )
+    max_chunk_tokens: int = (
+        3000  # Hard limit per chunk (efficient for user messages + context)
+    )
     user_message_priority: float = 0.6  # Proportion of tokens for user message
     context_priority: float = 0.4  # Proportion for surrounding context
     min_user_message_tokens: int = 100  # Minimum tokens to preserve user intent
@@ -176,7 +182,9 @@ class VectorDB:
                 )
 
                 if batch_tokens > 300000:
-                    logger.error(f"❌ BATCH TOO LARGE: {batch_tokens:,} tokens > 300K limit!")
+                    logger.error(
+                        f"❌ BATCH TOO LARGE: {batch_tokens:,} tokens > 300K limit!"
+                    )
                     raise ValueError(
                         f"Batch {i//batch_size + 1} has {batch_tokens:,} tokens, exceeds 300K limit"
                     )
@@ -193,14 +201,20 @@ class VectorDB:
                         elif isinstance(data, dict) and "embedding" in data:
                             batch_embeddings.append(data["embedding"])
                         else:
-                            logger.error(f"Unexpected data format: {type(data)}, {data}")
+                            logger.error(
+                                f"Unexpected data format: {type(data)}, {data}"
+                            )
                             raise ValueError(
                                 f"Cannot extract embedding from response data: {type(data)}"
                             )
                 else:
                     # Fallback for different response formats
-                    logger.error(f"Unexpected response format: {type(response)}, {response}")
-                    raise ValueError(f"Cannot extract embeddings from response: {type(response)}")
+                    logger.error(
+                        f"Unexpected response format: {type(response)}, {response}"
+                    )
+                    raise ValueError(
+                        f"Cannot extract embeddings from response: {type(response)}"
+                    )
 
                 embeddings.extend(batch_embeddings)
                 pbar.update(len(batch))
@@ -208,7 +222,9 @@ class VectorDB:
         return embeddings
 
     def load_data(
-        self, documents: List[Document], chunking_config: Optional[ChunkingConfig] = None
+        self,
+        documents: List[Document],
+        chunking_config: Optional[ChunkingConfig] = None,
     ) -> None:
         """
         Load documents into the vector database with optimized chunking.
@@ -286,7 +302,9 @@ class VectorDB:
 
         # Calculate similarities
         similarity_start_time = time.time()
-        logger.info(f"🔢 Computing similarities with {len(self.embeddings)} stored embeddings...")
+        logger.info(
+            f"🔢 Computing similarities with {len(self.embeddings)} stored embeddings..."
+        )
         similarities = np.dot(self.embeddings, query_embedding)
         similarity_end_time = time.time()
         logger.info(
@@ -297,7 +315,9 @@ class VectorDB:
         sort_start_time = time.time()
         top_indices = np.argsort(similarities)[::-1][:k]
         sort_end_time = time.time()
-        logger.info(f"⏱️  Sorting and top-k selection: {sort_end_time - sort_start_time:.2f}s")
+        logger.info(
+            f"⏱️  Sorting and top-k selection: {sort_end_time - sort_start_time:.2f}s"
+        )
 
         # Build results
         results_start_time = time.time()
@@ -311,7 +331,9 @@ class VectorDB:
             )
             results.append(result)
         results_end_time = time.time()
-        logger.info(f"⏱️  Results construction: {results_end_time - results_start_time:.2f}s")
+        logger.info(
+            f"⏱️  Results construction: {results_end_time - results_start_time:.2f}s"
+        )
 
         total_search_time = time.time() - search_start_time
         logger.info(f"⏱️  Total vector search time: {total_search_time:.2f}s")
@@ -341,21 +363,32 @@ class VectorDB:
                     session_data = doc.content
                 # Process each session separately
                 for session_id, session_content in session_data.items():
-                    if isinstance(session_content, dict) and "convo_events" in session_content:
+                    if (
+                        isinstance(session_content, dict)
+                        and "convo_events" in session_content
+                    ):
                         chunks = self._chunk_session_by_user_messages(
                             session_content, config, doc.doc_id, session_id
                         )
                         all_chunks.extend(chunks)
 
             except (json.JSONDecodeError, KeyError) as e:
-                logger.warning(f"Could not parse document {doc.doc_id} for chunking: {e}")
+                logger.warning(
+                    f"Could not parse document {doc.doc_id} for chunking: {e}"
+                )
                 continue
 
-        logger.info(f"Created {len(all_chunks)} optimized chunks from {len(documents)} documents")
+        logger.info(
+            f"Created {len(all_chunks)} optimized chunks from {len(documents)} documents"
+        )
         return all_chunks
 
     def _chunk_session_by_user_messages(
-        self, session: Dict[str, Any], config: ChunkingConfig, doc_id: str, session_id: str
+        self,
+        session: Dict[str, Any],
+        config: ChunkingConfig,
+        doc_id: str,
+        session_id: str,
     ) -> List[Dict[str, Any]]:
         """
         Enhanced chunking: one chunk per user message with surrounding context.
@@ -397,7 +430,9 @@ class VectorDB:
                     continue
 
                 # Extract surrounding context
-                surrounding_context = self._extract_surrounding_context(events, i, config)
+                surrounding_context = self._extract_surrounding_context(
+                    events, i, config
+                )
 
                 # Calculate total tokens (user message + context)
                 context_tokens = self._count_tokens(surrounding_context)
@@ -435,8 +470,12 @@ class VectorDB:
                             "token_count": self._count_tokens(final_user_content),
                             # Rich session info from detailed metadata
                             "session_title": detailed_metadata.get("title", ""),
-                            "repository_context": detailed_metadata.get("selected_repository", ""),
-                            "selected_branch": detailed_metadata.get("selected_branch", ""),
+                            "repository_context": detailed_metadata.get(
+                                "selected_repository", ""
+                            ),
+                            "selected_branch": detailed_metadata.get(
+                                "selected_branch", ""
+                            ),
                             "trigger": detailed_metadata.get("trigger", ""),
                             # Enhanced context
                             "surrounding_context": surrounding_context,
@@ -480,7 +519,9 @@ class VectorDB:
             cleaned = re.sub(pattern, "", cleaned, flags=re.DOTALL | re.IGNORECASE)
 
         # Clean up extra whitespace and empty lines
-        cleaned = re.sub(r"\n\s*\n\s*\n", "\n\n", cleaned)  # Reduce multiple empty lines
+        cleaned = re.sub(
+            r"\n\s*\n\s*\n", "\n\n", cleaned
+        )  # Reduce multiple empty lines
         cleaned = cleaned.strip()
 
         return cleaned
@@ -496,7 +537,9 @@ class VectorDB:
         Returns:
             Session metadata dictionary
         """
-        metadata_path = Path(f"data/user_model/user_model_detailed/{user_id}/{session_id}.json")
+        metadata_path = Path(
+            f"data/user_model/user_model_detailed/{user_id}/{session_id}.json"
+        )
 
         if metadata_path.exists():
             try:
@@ -510,7 +553,11 @@ class VectorDB:
         return {}
 
     def _create_all_one_need_string(
-        self, user_content: str, metadata: Dict[str, Any], surrounding_context: str, chunk_id: str
+        self,
+        user_content: str,
+        metadata: Dict[str, Any],
+        surrounding_context: str,
+        chunk_id: str,
     ) -> str:
         """
         Create a comprehensive markdown-formatted string with all important information.
@@ -638,7 +685,9 @@ class VectorDB:
         if current_tokens <= max_tokens:
             return content
 
-        logger.info(f"LLM condensing {content_type}: {current_tokens} -> {max_tokens} tokens")
+        logger.info(
+            f"LLM condensing {content_type}: {current_tokens} -> {max_tokens} tokens"
+        )
 
         # # Use LLM to condense while preserving main points
         # condensed = self._llm_condense_content(content, max_tokens, content_type)
@@ -771,7 +820,9 @@ def load_processed_data(data_path: str) -> List[Document]:
     data_dir = Path(data_path)
 
     if not data_dir.exists():
-        logger.warning(f"Data directory {data_path} does not exist. Creating empty document list.")
+        logger.warning(
+            f"Data directory {data_path} does not exist. Creating empty document list."
+        )
         return documents
 
     # Look for JSON files in the directory (each should be a user file)
