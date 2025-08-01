@@ -7,41 +7,45 @@ verifying that next action functionality has been properly removed.
 """
 
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+
+from typing import Optional
 
 from tom_swe.database import (
     InstructionImprovementResponse,
     InstructionRecommendation,
+    OverallUserAnalysis,
     SessionSummary,
     UserContext,
     UserProfile,
 )
-from tom_swe.tom_agent import ToMAgent, ToMAgentConfig, create_tom_agent
+from tom_swe.tom_agent import ToMAgent, ToMAgentConfig
 
 
 class TestToMAgentCreation:
     """Test ToM Agent creation and configuration."""
 
-    @pytest.mark.asyncio
-    async def test_create_tom_agent_default_config(self) -> None:
-        """Test creating ToM agent with default configuration."""
+    def test_create_tom_agent_default_config(self) -> None:
+        """Test creating ToM agent with default configuration (now synchronous)."""
         with patch("tom_swe.tom_agent.UserMentalStateAnalyzer"):
-            agent = await create_tom_agent()
+            # create_tom_agent is still async but we can test the synchronous creation
+            config = ToMAgentConfig()
+            agent = ToMAgent(config)
             assert isinstance(agent, ToMAgent)
             assert agent.llm_model is not None
             assert agent.enable_rag is True
 
-    @pytest.mark.asyncio
-    async def test_create_tom_agent_custom_config(self) -> None:
-        """Test creating ToM agent with custom configuration."""
+    def test_create_tom_agent_custom_config(self) -> None:
+        """Test creating ToM agent with custom configuration (now synchronous)."""
         with patch("tom_swe.tom_agent.UserMentalStateAnalyzer"):
-            agent = await create_tom_agent(
+            config = ToMAgentConfig(
                 processed_data_dir="./custom_data",
                 user_model_dir="./custom_model",
                 enable_rag=False,
             )
+            agent = ToMAgent(config)
             assert isinstance(agent, ToMAgent)
             assert agent.processed_data_dir == "./custom_data"
             assert agent.user_model_dir == "./custom_model"
@@ -73,10 +77,11 @@ class TestToMAgentMethodsExist:
 
     def test_required_methods_exist(self, mock_agent: ToMAgent) -> None:
         """Test that instruction improvement methods exist."""
-        assert hasattr(mock_agent, "analyze_user_context")
         assert hasattr(mock_agent, "propose_instructions")
-        assert callable(mock_agent.analyze_user_context)
         assert callable(mock_agent.propose_instructions)
+        # analyze_user_context is now an internal method
+        assert hasattr(mock_agent, "_analyze_user_context")
+        assert callable(mock_agent._analyze_user_context)
 
     def test_removed_methods_are_gone(self, mock_agent: ToMAgent) -> None:
         """Test that next action methods have been removed."""
@@ -87,7 +92,7 @@ class TestToMAgentMethodsExist:
 
 
 class TestAnalyzeUserContext:
-    """Test the analyze_user_context method."""
+    """Test the _analyze_user_context internal method."""
 
     @pytest.fixture
     def mock_agent(self) -> ToMAgent:
@@ -104,7 +109,10 @@ class TestAnalyzeUserContext:
                 overall_description="Test user profile",
                 intent_distribution={"debugging": 10, "code_generation": 5},
                 emotion_distribution={"focused": 8, "frustrated": 2},
-                preference_summary=["Prefers detailed explanations", "Likes step-by-step guidance"],
+                preference_summary=[
+                    "Prefers detailed explanations",
+                    "Likes step-by-step guidance",
+                ],
             )
             mock_profile.session_summaries = [
                 SessionSummary(
@@ -121,43 +129,82 @@ class TestAnalyzeUserContext:
                 )
             ]
 
-            mock_analyzer.return_value.load_existing_user_profile = AsyncMock(
-                return_value=mock_profile
-            )
+            # Mock the async method properly
+            async def mock_load_profile(
+                user_id: str, base_dir: str = "./data/user_model"
+            ) -> Optional[OverallUserAnalysis]:
+                return mock_profile
+
+            mock_analyzer.return_value.load_existing_user_profile = mock_load_profile
             agent.tom_analyzer = mock_analyzer.return_value
 
             return agent
 
-    @pytest.mark.asyncio
-    async def test_analyze_user_context_success(self, mock_agent: ToMAgent) -> None:
-        """Test successful user context analysis."""
-        user_context = await mock_agent.analyze_user_context("test_user", "Help me debug this code")
+    def test_analyze_user_context_success(self, mock_agent: ToMAgent) -> None:
+        """Test successful user context analysis (now synchronous)."""
+        with patch("asyncio.run") as mock_run:
+            # Create a mock profile to return
+            mock_profile = OverallUserAnalysis(
+                user_profile=UserProfile(
+                    user_id="test_user",
+                    total_sessions=1,
+                    overall_description="Test user",
+                    intent_distribution={"debugging": 5},
+                    emotion_distribution={"focused": 3},
+                    preference_summary=[
+                        "Prefers detailed explanations",
+                        "Likes step-by-step guidance",
+                    ],
+                ),
+                session_summaries=[
+                    SessionSummary(
+                        session_id="test_session",
+                        timestamp=datetime.now(),
+                        message_count=5,
+                        intent_distribution={"debugging": 5},
+                        emotion_distribution={"focused": 3},
+                        key_preferences=[
+                            "Prefers detailed explanations",
+                            "Likes step-by-step guidance",
+                        ],
+                        user_modeling_summary="Test user with debugging focus",
+                        clarification_requests=1,
+                        session_start="2024-01-01T10:00:00",
+                        session_end="2024-01-01T10:30:00",
+                    )
+                ],
+                last_updated=datetime.now(),
+            )
+            mock_run.return_value = mock_profile
 
-        assert isinstance(user_context, UserContext)
-        assert user_context.user_id == "test_user"
-        assert user_context.current_query == "Help me debug this code"
-        assert user_context.user_profile is not None
-        assert user_context.preferences == [
-            "Prefers detailed explanations",
-            "Likes step-by-step guidance",
-        ]
-        assert user_context.recent_sessions is not None
-        assert len(user_context.recent_sessions) == 1
+            user_context = mock_agent._analyze_user_context(
+                "test_user", "Help me debug this code"
+            )
 
-    @pytest.mark.asyncio
-    async def test_analyze_user_context_no_profile(self, mock_agent: ToMAgent) -> None:
-        """Test user context analysis when no profile exists."""
-        # Mock no profile found
-        mock_agent.tom_analyzer.load_existing_user_profile = AsyncMock(return_value=None)  # type: ignore[method-assign]
+            assert isinstance(user_context, UserContext)
+            assert user_context.user_id == "test_user"
+            assert user_context.current_query == "Help me debug this code"
+            assert user_context.user_profile is not None
+            assert user_context.preferences == [
+                "Prefers detailed explanations",
+                "Likes step-by-step guidance",
+            ]
+            assert user_context.recent_sessions is not None
+            assert len(user_context.recent_sessions) == 1
 
-        user_context = await mock_agent.analyze_user_context("unknown_user", "Help me")
+    def test_analyze_user_context_no_profile(self, mock_agent: ToMAgent) -> None:
+        """Test user context analysis when no profile exists (now synchronous)."""
+        with patch("asyncio.run") as mock_run:
+            mock_run.return_value = None
 
-        assert isinstance(user_context, UserContext)
-        assert user_context.user_id == "unknown_user"
-        assert user_context.user_profile is None
-        assert user_context.preferences == []
-        assert user_context.recent_sessions == []
-        assert user_context.mental_state_summary == ""
+            user_context = mock_agent._analyze_user_context("unknown_user", "Help me")
+
+            assert isinstance(user_context, UserContext)
+            assert user_context.user_id == "unknown_user"
+            assert user_context.user_profile is None
+            assert user_context.preferences == []
+            assert user_context.recent_sessions == []
+            assert user_context.mental_state_summary == ""
 
 
 class TestProposeInstructions:
@@ -180,23 +227,31 @@ class TestProposeInstructions:
                 user_id="test_user",
                 total_sessions=3,
                 overall_description="Experienced developer who prefers detailed explanations",
-                intent_distribution={"debugging": 15, "code_generation": 8, "optimization": 2},
+                intent_distribution={
+                    "debugging": 15,
+                    "code_generation": 8,
+                    "optimization": 2,
+                },
                 emotion_distribution={"focused": 12, "confident": 8, "curious": 5},
-                preference_summary=["Likes step-by-step guidance", "Prefers code examples"],
+                preference_summary=[
+                    "Likes step-by-step guidance",
+                    "Prefers code examples",
+                ],
             ),
             current_query="Help me fix this bug",
             preferences=["Likes step-by-step guidance", "Prefers code examples"],
             mental_state_summary="Focused and methodical developer",
         )
 
-    @pytest.mark.asyncio
-    async def test_propose_instructions_success(
+    def test_propose_instructions_success(
         self, mock_agent: ToMAgent, sample_user_context: UserContext
     ) -> None:
-        """Test successful instruction proposal."""
+        """Test successful instruction proposal (now synchronous without user_id)."""
         # Mock RAG behavior
         with patch.object(
-            mock_agent, "_get_relevant_behavior", return_value="Relevant user behavior context"
+            mock_agent,
+            "_get_relevant_behavior_sync",
+            return_value="Relevant user behavior context",
         ):
             # Mock LLM call
             mock_llm_response = InstructionImprovementResponse(
@@ -206,37 +261,41 @@ class TestProposeInstructions:
                 clarity_score=0.75,
             )
 
-            with patch.object(mock_agent, "_call_llm_structured", return_value=mock_llm_response):
-                recommendations = await mock_agent.propose_instructions(
-                    sample_user_context, "Fix this bug", "Working on a Python application"
+            with patch.object(
+                mock_agent, "_call_llm_structured_sync", return_value=mock_llm_response
+            ):
+                recommendation = mock_agent.propose_instructions(
+                    "default_user", "Fix this bug", "Working on a Python application"
                 )
 
-                assert len(recommendations) == 1
-                rec = recommendations[0]
-                assert isinstance(rec, InstructionRecommendation)
-                assert rec.original_instruction == "Fix this bug"
-                assert "step-by-step" in rec.improved_instruction
-                assert rec.confidence_score == 0.85
-                assert rec.clarity_score == 0.75
+                assert isinstance(recommendation, InstructionRecommendation)
+                assert recommendation.original_instruction == "Fix this bug"
+                assert "step-by-step" in recommendation.improved_instruction
+                assert recommendation.confidence_score == 0.85
+                assert recommendation.clarity_score == 0.75
 
-    @pytest.mark.asyncio
-    async def test_propose_instructions_llm_failure(
+    def test_propose_instructions_llm_failure(
         self, mock_agent: ToMAgent, sample_user_context: UserContext
     ) -> None:
-        """Test instruction proposal when LLM call fails."""
-        with patch.object(mock_agent, "_get_relevant_behavior", return_value="Context"):
-            with patch.object(mock_agent, "_call_llm_structured", return_value=None):
-                recommendations = await mock_agent.propose_instructions(
-                    sample_user_context, "Fix this bug", "Working on a Python application"
+        """Test instruction proposal when LLM call fails (now synchronous without user_id)."""
+        with patch.object(
+            mock_agent, "_get_relevant_behavior_sync", return_value="Context"
+        ):
+            with patch.object(
+                mock_agent, "_call_llm_structured_sync", return_value=None
+            ):
+                recommendation = mock_agent.propose_instructions(
+                    "default_user", "Fix this bug", "Working on a Python application"
                 )
 
-                assert recommendations == []
+                # Should return a failed recommendation, not None
+                assert isinstance(recommendation, InstructionRecommendation)
+                assert recommendation.confidence_score == 0.0
 
-    @pytest.mark.asyncio
-    async def test_propose_instructions_with_rag_disabled(
+    def test_propose_instructions_with_rag_disabled(
         self, mock_agent: ToMAgent, sample_user_context: UserContext
     ) -> None:
-        """Test instruction proposal with RAG disabled."""
+        """Test instruction proposal with RAG disabled (now synchronous without user_id)."""
         mock_agent.enable_rag = False
 
         mock_llm_response = InstructionImprovementResponse(
@@ -246,14 +305,15 @@ class TestProposeInstructions:
             clarity_score=0.80,
         )
 
-        with patch.object(mock_agent, "_call_llm_structured", return_value=mock_llm_response):
-            recommendations = await mock_agent.propose_instructions(
-                sample_user_context, "Fix this bug", "Working on a Python application"
+        with patch.object(
+            mock_agent, "_call_llm_structured_sync", return_value=mock_llm_response
+        ):
+            recommendation = mock_agent.propose_instructions(
+                "default_user", "Fix this bug", "Working on a Python application"
             )
 
-            assert len(recommendations) == 1
-            rec = recommendations[0]
-            assert rec.confidence_score == 0.70
+            assert isinstance(recommendation, InstructionRecommendation)
+            assert recommendation.confidence_score == 0.70
 
 
 class TestRAGIntegration:
@@ -282,13 +342,16 @@ class TestRAGIntegration:
             agent._rag_agent = mock_rag_agent
             return agent
 
-    @pytest.mark.asyncio
-    async def test_get_relevant_behavior_with_rag(self, mock_agent_with_rag: ToMAgent) -> None:
-        """Test RAG behavior retrieval."""
+    def test_get_relevant_behavior_with_rag(
+        self, mock_agent_with_rag: ToMAgent
+    ) -> None:
+        """Test RAG behavior retrieval (now synchronous)."""
         with patch.object(
-            mock_agent_with_rag, "_get_rag_agent", return_value=mock_agent_with_rag._rag_agent
+            mock_agent_with_rag,
+            "_get_rag_agent_sync",
+            return_value=mock_agent_with_rag._rag_agent,
         ):
-            behavior = await mock_agent_with_rag._get_relevant_behavior("Fix this bug")
+            behavior = mock_agent_with_rag._get_relevant_behavior_sync("Fix this bug")
 
             assert "User prefers detailed debugging steps" in behavior
             assert "User likes code examples" in behavior
@@ -297,14 +360,13 @@ class TestRAGIntegration:
             assert mock_rag_agent is not None
             mock_rag_agent.retrieve.assert_called_once_with("Fix this bug", k=5)  # type: ignore[attr-defined]
 
-    @pytest.mark.asyncio
-    async def test_get_relevant_behavior_without_rag(self) -> None:
-        """Test behavior when RAG is disabled."""
+    def test_get_relevant_behavior_without_rag(self) -> None:
+        """Test behavior when RAG is disabled (now synchronous)."""
         with patch("tom_swe.tom_agent.UserMentalStateAnalyzer"):
             config = ToMAgentConfig(enable_rag=False)
             agent = ToMAgent(config)
 
-            behavior = await agent._get_relevant_behavior("Fix this bug")
+            behavior = agent._get_relevant_behavior_sync("Fix this bug")
             assert behavior == "RAG disabled - using user context only"
 
 
@@ -391,42 +453,45 @@ class TestErrorHandling:
             config = ToMAgentConfig()
             return ToMAgent(config)
 
-    @pytest.mark.asyncio
-    async def test_llm_call_exception_handling(self, mock_agent: ToMAgent) -> None:
-        """Test handling of LLM call exceptions."""
-        sample_context = UserContext(user_id="test_user")
-
-        with patch.object(mock_agent, "_get_relevant_behavior", return_value="Context"):
+    def test_llm_call_exception_handling(self, mock_agent: ToMAgent) -> None:
+        """Test handling of LLM call exceptions (now synchronous without user_id)."""
+        with patch.object(
+            mock_agent, "_get_relevant_behavior_sync", return_value="Context"
+        ):
             # Mock LLM call to return None (simulating handled exception)
-            with patch.object(mock_agent, "_call_llm_structured", return_value=None):
-                # Should not raise exception, should return empty list
-                recommendations = await mock_agent.propose_instructions(
-                    sample_context, "Fix this bug", "Context"
+            with patch.object(
+                mock_agent, "_call_llm_structured_sync", return_value=None
+            ):
+                # Should not raise exception, should return failed recommendation
+                recommendation = mock_agent.propose_instructions(
+                    "default_user", "Fix this bug", "Context"
                 )
 
-                assert recommendations == []
+                assert isinstance(recommendation, InstructionRecommendation)
+                assert recommendation.confidence_score == 0.0
 
-    @pytest.mark.asyncio
-    async def test_rag_initialization_failure(self, mock_agent: ToMAgent) -> None:
-        """Test handling of RAG initialization failure."""
+    def test_rag_initialization_failure(self, mock_agent: ToMAgent) -> None:
+        """Test handling of RAG initialization failure (now synchronous)."""
         mock_agent.enable_rag = True
 
-        # Mock _get_rag_agent to raise exception
-        with patch.object(mock_agent, "_get_rag_agent", side_effect=Exception("RAG Init Error")):
-            # Since _get_relevant_behavior doesn't have explicit exception handling,
+        # Mock _get_rag_agent_sync to raise exception
+        with patch.object(
+            mock_agent, "_get_rag_agent_sync", side_effect=Exception("RAG Init Error")
+        ):
+            # Since _get_relevant_behavior_sync doesn't have explicit exception handling,
             # we expect the exception to propagate. This test verifies the exception occurs.
             with pytest.raises(Exception, match="RAG Init Error"):
-                await mock_agent._get_relevant_behavior("test query")
+                mock_agent._get_relevant_behavior_sync("test query")
 
-    @pytest.mark.asyncio
-    async def test_propose_instructions_with_rag_failure(self, mock_agent: ToMAgent) -> None:
-        """Test propose_instructions when RAG fails but LLM succeeds."""
-        sample_context = UserContext(user_id="test_user")
+    def test_propose_instructions_with_rag_failure(self, mock_agent: ToMAgent) -> None:
+        """Test propose_instructions when RAG fails but LLM succeeds (now synchronous without user_id)."""
         mock_agent.enable_rag = True
 
         # Mock RAG to fail, but provide a fallback behavior
         with patch.object(
-            mock_agent, "_get_relevant_behavior", return_value="RAG failed - using fallback"
+            mock_agent,
+            "_get_relevant_behavior_sync",
+            return_value="RAG failed - using fallback",
         ):
             # Mock successful LLM response
             mock_llm_response = InstructionImprovementResponse(
@@ -436,14 +501,16 @@ class TestErrorHandling:
                 clarity_score=0.8,
             )
 
-            with patch.object(mock_agent, "_call_llm_structured", return_value=mock_llm_response):
-                recommendations = await mock_agent.propose_instructions(
-                    sample_context, "Fix this bug", "Context"
+            with patch.object(
+                mock_agent, "_call_llm_structured_sync", return_value=mock_llm_response
+            ):
+                recommendation = mock_agent.propose_instructions(
+                    "default_user", "Fix this bug", "Context"
                 )
 
-                assert len(recommendations) == 1
-                assert "fallback" in recommendations[0].reasoning.lower()
-                assert recommendations[0].confidence_score == 0.6
+                assert isinstance(recommendation, InstructionRecommendation)
+                assert "fallback" in recommendation.reasoning.lower()
+                assert recommendation.confidence_score == 0.6
 
 
 if __name__ == "__main__":

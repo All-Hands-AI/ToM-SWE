@@ -29,14 +29,18 @@ class LLMClient:
         if self.provider == "openai":
             api_key = self.config.get("api_key") or os.environ.get("OPENAI_API_KEY")
             if not api_key:
-                logger.warning("OpenAI API key not found. Set OPENAI_API_KEY environment variable.")
+                logger.warning(
+                    "OpenAI API key not found. Set OPENAI_API_KEY environment variable."
+                )
                 self.client = None
             else:
                 self.client = OpenAI(api_key=api_key)
         else:
             self.client = None
 
-        logger.info(f"LLMClient initialized with provider: {self.provider}, model: {self.model}")
+        logger.info(
+            f"LLMClient initialized with provider: {self.provider}, model: {self.model}"
+        )
 
     def generate(self, prompt: str) -> str:
         """Generate text using the language model.
@@ -52,7 +56,9 @@ class LLMClient:
         if self.provider == "openai":
             return self._generate_openai(prompt)
         else:
-            logger.warning(f"Unsupported provider: {self.provider}, falling back to mock response")
+            logger.warning(
+                f"Unsupported provider: {self.provider}, falling back to mock response"
+            )
             return self._generate_mock(prompt)
 
     def analyze_code(self, code: str, task: str) -> Dict[str, Any]:
@@ -85,7 +91,9 @@ class LLMClient:
             Generated text.
         """
         if not self.client:
-            logger.warning("OpenAI client not initialized, falling back to mock response")
+            logger.warning(
+                "OpenAI client not initialized, falling back to mock response"
+            )
             return self._generate_mock(prompt)
 
         try:

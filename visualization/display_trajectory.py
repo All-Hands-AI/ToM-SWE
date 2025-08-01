@@ -107,7 +107,9 @@ def get_color_for_source(source: str, color_map: Dict[str, str]) -> str:
     return color_map[source]
 
 
-def format_content(content: str, source: str = "", action: str = "", max_length: int = 500) -> str:
+def format_content(
+    content: str, source: str = "", action: str = "", max_length: int = 500
+) -> str:
     """Format content with truncation if too long, but preserve user messages."""
     # Don't truncate user messages or important content
     if source == "user" or action == "message":
@@ -118,7 +120,8 @@ def format_content(content: str, source: str = "", action: str = "", max_length:
         return str(escape(content))
 
     return str(
-        escape(content[:max_length]) + "\n\n[dim]... (content truncated for readability)[/dim]"
+        escape(content[:max_length])
+        + "\n\n[dim]... (content truncated for readability)[/dim]"
     )
 
 
@@ -267,14 +270,18 @@ def display_conversation(config: ConversationDisplayConfig, console: Console) ->
         else:
             style = "white"
 
-        console.print(Panel(formatted_content, title=title, style=style, title_align="left"))
+        console.print(
+            Panel(formatted_content, title=title, style=style, title_align="left")
+        )
 
     console.print()  # Add spacing
 
 
 def display_navigation_help(console: Console):
     """Display navigation help."""
-    help_table = Table(title="Navigation Commands", show_header=True, header_style="bold magenta")
+    help_table = Table(
+        title="Navigation Commands", show_header=True, header_style="bold magenta"
+    )
     help_table.add_column("Command", style="cyan")
     help_table.add_column("Description", style="white")
 
@@ -291,13 +298,17 @@ def display_navigation_help(console: Console):
 
 
 def display_conversation_list(
-    conversations: List[Tuple[str, Dict[str, Any]]], console: Console, current_index: int = -1
+    conversations: List[Tuple[str, Dict[str, Any]]],
+    console: Console,
+    current_index: int = -1,
 ):
     """Display a paginated list of conversations."""
     console.clear()
 
     # Create table
-    table = Table(title="Available Conversations", show_header=True, header_style="bold green")
+    table = Table(
+        title="Available Conversations", show_header=True, header_style="bold green"
+    )
     table.add_column("#", style="cyan", width=4)
     table.add_column("Conversation ID", style="white")
     table.add_column("Start Time", style="bright_green")
@@ -450,7 +461,9 @@ def handle_digit_command(
             )
             display_conversation(config, console)
         else:
-            console.print(f"[red]Invalid conversation number. Range: 1-{len(conversations)}[/red]")
+            console.print(
+                f"[red]Invalid conversation number. Range: 1-{len(conversations)}[/red]"
+            )
     except ValueError:
         console.print("[red]Invalid number![/red]")
     return current_index, user_only_mode
@@ -515,7 +528,8 @@ def handle_command(
 
     else:
         console.print(
-            f"[red]Unknown command: '{command}'. " f"Type 'help' for available commands.[/red]"
+            f"[red]Unknown command: '{command}'. "
+            f"Type 'help' for available commands.[/red]"
         )
 
     return current_index, user_only_mode, False  # False indicates should continue
@@ -539,7 +553,9 @@ def interactive_viewer(user_id: str) -> None:
         console.print(
             f"\n[bold green]Interactive Trajectory Viewer for User: {user_id}[/bold green]"
         )
-        console.print(f"Total conversations: {len(conversations)} (sorted by start time)")
+        console.print(
+            f"Total conversations: {len(conversations)} (sorted by start time)"
+        )
         console.print("[dim]Type 'help' for navigation commands[/dim]\n")
 
         current_index = 0
@@ -563,7 +579,9 @@ def interactive_viewer(user_id: str) -> None:
                 f"[dim]Conversation {current_index + 1}/{len(conversations)}"
                 f"{mode_indicator} | Type 'help' for commands[/dim]"
             )
-            command = Prompt.ask("[bold cyan]Navigation", default="next").strip().lower()
+            command = (
+                Prompt.ask("[bold cyan]Navigation", default="next").strip().lower()
+            )
 
             current_index, user_only_mode, should_exit = handle_command(
                 command, current_index, conversations, user_only_mode, console
@@ -608,7 +626,9 @@ def display_trajectory(
         console.print(
             f"\n[bold green]Trajectory Viewer for User: {user_id}{mode_text}[/bold green]"
         )
-        console.print(f"Total conversations: {len(conversations)} (sorted by start time)\n")
+        console.print(
+            f"Total conversations: {len(conversations)} (sorted by start time)\n"
+        )
 
         # Display specific conversation or all conversations
         if conversation_id:
@@ -658,12 +678,18 @@ def main():
     """Main entry point for the trajectory viewer."""
     parser = argparse.ArgumentParser(description="Rich-based trajectory viewer")
     parser.add_argument("user_id", help="User ID to display trajectory for")
-    parser.add_argument("--conversation", "-c", help="Specific conversation ID to display")
+    parser.add_argument(
+        "--conversation", "-c", help="Specific conversation ID to display"
+    )
     parser.add_argument(
         "--list", "-l", action="store_true", help="List available conversations only"
     )
-    parser.add_argument("--interactive", "-i", action="store_true", help="Start interactive viewer")
-    parser.add_argument("--user-only", "-u", action="store_true", help="Show only user messages")
+    parser.add_argument(
+        "--interactive", "-i", action="store_true", help="Start interactive viewer"
+    )
+    parser.add_argument(
+        "--user-only", "-u", action="store_true", help="Show only user messages"
+    )
 
     args = parser.parse_args()
 

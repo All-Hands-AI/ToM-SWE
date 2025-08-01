@@ -81,7 +81,9 @@ def plot_trajectory(trajectory_data: List[Dict[str, Any]], user_id: str) -> None
     plt.close(fig)
 
 
-def create_interactive_visualization(trajectory_data: List[Dict[str, Any]], user_id: str) -> str:
+def create_interactive_visualization(
+    trajectory_data: List[Dict[str, Any]], user_id: str
+) -> str:
     """Create an interactive HTML visualization of code trajectory.
 
     Args:
@@ -112,7 +114,9 @@ def create_interactive_visualization(trajectory_data: List[Dict[str, Any]], user
                     "functions": analysis.get("functions", 0),
                     "classes": analysis.get("classes", 0),
                     "lines": analysis.get("lines", 0),
-                    "intent": analysis.get("intent_analysis", {}).get("inferred_intent", ""),
+                    "intent": analysis.get("intent_analysis", {}).get(
+                        "inferred_intent", ""
+                    ),
                 }
             )
 
@@ -321,7 +325,9 @@ class TrajectoryViewer:
                 analysis_data = json.load(f)
 
             # Create visualization
-            vis_path = create_interactive_visualization(analysis_data.get("results", []), user_id)
+            vis_path = create_interactive_visualization(
+                analysis_data.get("results", []), user_id
+            )
 
             final_result: str = render_template(
                 "trajectory.html",

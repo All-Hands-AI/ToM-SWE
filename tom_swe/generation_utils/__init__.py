@@ -7,13 +7,16 @@ This module provides improved LLM calling mechanisms with:
 - Better error handling and retry logic
 """
 
-from .generate import call_llm_simple, call_llm_structured, format_bad_output, generate_with_schema
+from .generate import (
+    LLMClient,
+    LLMConfig,
+    create_llm_client,
+)
 from .output_parsers import PydanticOutputParser
 
 __all__ = [
     "PydanticOutputParser",
-    "generate_with_schema",
-    "call_llm_structured",
-    "call_llm_simple",
-    "format_bad_output",
+    "LLMClient",
+    "LLMConfig",
+    "create_llm_client",
 ]

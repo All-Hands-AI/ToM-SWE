@@ -19,14 +19,18 @@ class ProposeInstructionsRequest(BaseModel):
 
     user_id: str = Field(description="The user ID")
     original_instruction: str = Field(description="The original instruction to improve")
-    context: str = Field(description="Context including previous conversations and interactions")
+    context: str = Field(
+        description="Context including previous conversations and interactions"
+    )
 
 
 class ProposeInstructionsResponse(BaseModel):
     """Response model for propose_instructions endpoint."""
 
     user_id: str = Field(description="The user ID")
-    original_instruction: str = Field(description="The original instruction that was improved")
+    original_instruction: str = Field(
+        description="The original instruction that was improved"
+    )
     recommendations: List[InstructionRecommendation] = Field(
         description="List of instruction recommendations"
     )
@@ -47,7 +51,9 @@ class ErrorResponse(BaseModel):
 
     success: bool = Field(default=False, description="Always false for error responses")
     error: str = Field(description="Error message")
-    detail: Optional[str] = Field(default=None, description="Detailed error information")
+    detail: Optional[str] = Field(
+        default=None, description="Detailed error information"
+    )
 
 
 class ConversationStatusResponse(BaseModel):

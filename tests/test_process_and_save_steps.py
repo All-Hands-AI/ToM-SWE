@@ -52,7 +52,9 @@ class TestDataLoading:
 
     @pytest.mark.asyncio
     async def test_get_user_session_ids_empty_file(
-        self, analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str], empty_user_data: Any
+        self,
+        analyzer_with_temp_dir: Tuple[UserMentalStateAnalyzer, str],
+        empty_user_data: Any,
     ) -> None:
         """Test getting session IDs for user with empty data."""
         analyzer, temp_dir = analyzer_with_temp_dir
@@ -99,7 +101,9 @@ class TestStep1AnalyzeUserMentalState:
 
         assert isinstance(result, tuple)
         analyses, messages = result
-        assert len(analyses) == EXPECTED_USER_MESSAGE_COUNT  # Two user messages in session_001
+        assert (
+            len(analyses) == EXPECTED_USER_MESSAGE_COUNT
+        )  # Two user messages in session_001
         assert all(isinstance(analysis, UserMessageAnalysis) for analysis in analyses)
 
     @pytest.mark.asyncio
@@ -109,7 +113,9 @@ class TestStep1AnalyzeUserMentalState:
         """Test analysis with non-existent session."""
         analyzer, temp_dir, user_id = user_file_setup
 
-        result = await analyzer.analyze_all_session_messages(user_id, "nonexistent_session")
+        result = await analyzer.analyze_all_session_messages(
+            user_id, "nonexistent_session"
+        )
 
         if result is None:
             # No session found, which is expected behavior
@@ -126,7 +132,9 @@ class TestStep1AnalyzeUserMentalState:
         """Test analysis with non-existent user."""
         analyzer, temp_dir = analyzer_with_temp_dir
 
-        result = await analyzer.analyze_all_session_messages("nonexistent_user", "session_001")
+        result = await analyzer.analyze_all_session_messages(
+            "nonexistent_user", "session_001"
+        )
 
         assert result is None
 
@@ -146,7 +154,9 @@ class TestStep2SaveSessionAnalysesToJsonl:
         session_id = "test_session"
 
         # Create matching user messages for the analyses
-        user_messages = [f"User message {i}" for i in range(len(sample_message_analyses))]
+        user_messages = [
+            f"User message {i}" for i in range(len(sample_message_analyses))
+        ]
 
         await analyzer.save_session_analyses_to_json(
             user_id, session_id, (sample_message_analyses, user_messages), None
@@ -372,7 +382,9 @@ class TestStep4UpdateOverallUserAnalysis:
             session_end="2024-01-15T10:30:00",
         )
 
-        await analyzer.save_updated_user_profile(user_id, [new_session_summary], base_dir)
+        await analyzer.save_updated_user_profile(
+            user_id, [new_session_summary], base_dir
+        )
 
         # Check updated content
         with open(overall_path, encoding="utf-8") as f:
@@ -398,14 +410,18 @@ class TestIntegrationProcessAndSaveUserSession:
         base_dir = os.path.join(temp_dir, "user_model")
 
         # Mock the analyze_all_session_messages method
-        with patch.object(analyzer, "analyze_all_session_messages", mock_analyze_user_mental_state):
+        with patch.object(
+            analyzer, "analyze_all_session_messages", mock_analyze_user_mental_state
+        ):
             session_summary = await analyzer.process_and_save_single_session(
                 user_id, session_id, None
             )
 
             # Also update the user profile to create the overall analysis file
             if session_summary:
-                await analyzer.save_updated_user_profile(user_id, [session_summary], base_dir)
+                await analyzer.save_updated_user_profile(
+                    user_id, [session_summary], base_dir
+                )
 
         # Check that all three tiers were created
 
@@ -442,11 +458,15 @@ class TestIntegrationProcessAndSaveUserSession:
         base_dir = os.path.join(temp_dir, "user_model")
 
         # Mock analyze_all_session_messages to return empty list
-        with patch.object(analyzer, "analyze_all_session_messages", return_value=([], [])):
+        with patch.object(
+            analyzer, "analyze_all_session_messages", return_value=([], [])
+        ):
             await analyzer.process_and_save_single_session(user_id, "session_001", None)
 
         # Should not create any files
-        jsonl_path = os.path.join(base_dir, "user_model_detailed", user_id, "session_001.jsonl")
+        jsonl_path = os.path.join(
+            base_dir, "user_model_detailed", user_id, "session_001.jsonl"
+        )
         overall_path = os.path.join(base_dir, "user_model_overall", f"{user_id}.json")
 
         assert not os.path.exists(jsonl_path)
@@ -523,6 +543,9 @@ class TestUtilityFunctions:
         analyzer.update_user_profile_with_session(analysis)
 
         assert analysis.user_profile.total_sessions == EXPECTED_SESSION_COUNT
-        assert analysis.user_profile.intent_distribution["debugging"] == EXPECTED_SESSION_COUNT
+        assert (
+            analysis.user_profile.intent_distribution["debugging"]
+            == EXPECTED_SESSION_COUNT
+        )
         assert analysis.user_profile.intent_distribution["optimization"] == 1
         assert len(analysis.user_profile.preference_summary) >= 0  # Can be empty

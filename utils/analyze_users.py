@@ -19,7 +19,10 @@ from utils.data_utils import get_user_data_files, load_json, save_json
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("analyze_users.log"), logging.StreamHandler(sys.stdout)],
+    handlers=[
+        logging.FileHandler("analyze_users.log"),
+        logging.StreamHandler(sys.stdout),
+    ],
 )
 
 logger = logging.getLogger(__name__)
@@ -67,7 +70,9 @@ def analyze_user(user_file: Path, analyzer: CodeAnalyzer) -> Dict[str, Any]:
         code = snapshot.get("code", "")
 
         if not timestamp or not code:
-            logger.warning(f"Invalid snapshot for user {user_id}: missing timestamp or code")
+            logger.warning(
+                f"Invalid snapshot for user {user_id}: missing timestamp or code"
+            )
             continue
 
         try:
@@ -77,7 +82,9 @@ def analyze_user(user_file: Path, analyzer: CodeAnalyzer) -> Dict[str, Any]:
 
             logger.info(f"Analyzed snapshot from {timestamp} for user {user_id}")
         except Exception as e:
-            logger.error(f"Error analyzing snapshot from {timestamp} for user {user_id}: {e}")
+            logger.error(
+                f"Error analyzing snapshot from {timestamp} for user {user_id}: {e}"
+            )
 
     # Generate summary
     summary = generate_summary(results)
@@ -141,13 +148,13 @@ def generate_summary(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         last_classes = results[-1].get("analysis", {}).get("classes", 0)
 
         if last_classes > first_classes:
-            learning_curve = "The user progressed from procedural to object-oriented programming."
+            learning_curve = (
+                "The user progressed from procedural to object-oriented programming."
+            )
         elif last_functions > first_functions:
             learning_curve = "The user added more functionality over time."
         else:
-            learning_curve = (
-                "The user refined their initial approach without major structural changes."
-            )
+            learning_curve = "The user refined their initial approach without major structural changes."
     else:
         learning_curve = "Insufficient data to determine learning curve."
 
@@ -158,7 +165,9 @@ def generate_summary(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         last_code = results[-1].get("analysis", {}).get("parse_error") is None
 
         if not first_code and last_code:
-            code_quality = "The user's code quality improved from invalid to valid syntax."
+            code_quality = (
+                "The user's code quality improved from invalid to valid syntax."
+            )
         elif first_code and last_code:
             code_quality = "The user maintained valid code throughout the session."
         else:
@@ -171,7 +180,9 @@ def generate_summary(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         if intent_values[0] != intent_values[-1]:
             intent_evolution = "The user's intent evolved during the session."
         else:
-            intent_evolution = "The user maintained a consistent intent throughout the session."
+            intent_evolution = (
+                "The user maintained a consistent intent throughout the session."
+            )
     else:
         intent_evolution = "Insufficient data to analyze intent evolution."
 
@@ -203,10 +214,16 @@ def main():
     """Main function."""
     parser = argparse.ArgumentParser(description="Analyze user code trajectories")
     parser.add_argument(
-        "--data-dir", type=str, default="data", help="Directory containing user data files"
+        "--data-dir",
+        type=str,
+        default="data",
+        help="Directory containing user data files",
     )
     parser.add_argument(
-        "--user-id", type=str, default=None, help="Specific user ID to analyze (optional)"
+        "--user-id",
+        type=str,
+        default=None,
+        help="Specific user ID to analyze (optional)",
     )
     parser.add_argument(
         "--output-dir",

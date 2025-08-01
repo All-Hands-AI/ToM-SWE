@@ -79,7 +79,9 @@ def save_env_file(env_content):
     """Save .env file with user confirmation if it exists."""
     env_path = Path(".env")
     if env_path.exists():
-        overwrite = input("\n.env file already exists. Overwrite? (y/N): ").strip().lower()
+        overwrite = (
+            input("\n.env file already exists. Overwrite? (y/N): ").strip().lower()
+        )
         if overwrite != "y":
             print("Configuration cancelled.")
             return False

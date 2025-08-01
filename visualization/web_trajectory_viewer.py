@@ -219,7 +219,9 @@ def sort_conversations_by_user_messages(
         conversations.append((conv_id, conv_data, user_msg_count))
 
     # Sort by user message count
-    conversations.sort(key=lambda x: x[2] if x[2] is not None else 0, reverse=descending)
+    conversations.sort(
+        key=lambda x: x[2] if x[2] is not None else 0, reverse=descending
+    )
 
     # Return just the conv_id and conv_data
     return [(conv_id, conv_data) for conv_id, conv_data, _ in conversations]
@@ -384,7 +386,9 @@ def user_conversations(user_id: str):
     try:
         # Get pagination parameters
         page = int(request.args.get("page", 1))
-        per_page = int(request.args.get("per_page", 50))  # Default 50 conversations per page
+        per_page = int(
+            request.args.get("per_page", 50)
+        )  # Default 50 conversations per page
 
         # Load only metadata for listing
         conversation_metadata = load_conversation_metadata_only(user_id)
@@ -398,7 +402,9 @@ def user_conversations(user_id: str):
         conversation_list = []
         for conv_id, conv_meta in conversation_metadata.items():
             # Enrich with studio metadata
-            enriched_meta = enrich_conversation_metadata(conv_id, conv_meta, studio_metadata)
+            enriched_meta = enrich_conversation_metadata(
+                conv_id, conv_meta, studio_metadata
+            )
 
             # Apply GUI filter if requested
             if gui_only and not enriched_meta.get("is_gui", False):
@@ -408,7 +414,9 @@ def user_conversations(user_id: str):
 
         # Sort conversations
         if sort_by == "user_messages":
-            conversation_list.sort(key=lambda x: x.get("user_message_count", 0), reverse=True)
+            conversation_list.sort(
+                key=lambda x: x.get("user_message_count", 0), reverse=True
+            )
         else:
             conversation_list.sort(key=lambda x: x.get("convo_start", ""))
 
@@ -465,7 +473,9 @@ def user_conversations(user_id: str):
         )
 
     except FileNotFoundError:
-        return render_template("error.html", error=f"Trajectory data not found for user: {user_id}")
+        return render_template(
+            "error.html", error=f"Trajectory data not found for user: {user_id}"
+        )
     except Exception as e:
         return render_template("error.html", error=f"Error loading data: {e!s}")
 
@@ -487,7 +497,9 @@ def view_conversation(user_id: str, conv_index: int):
         # Filter and sort metadata the same way as the list view
         filtered_metadata = []
         for conv_id, conv_meta in conversation_metadata.items():
-            enriched_meta = enrich_conversation_metadata(conv_id, conv_meta, studio_metadata)
+            enriched_meta = enrich_conversation_metadata(
+                conv_id, conv_meta, studio_metadata
+            )
 
             if gui_only and not enriched_meta.get("is_gui", False):
                 continue
@@ -496,12 +508,16 @@ def view_conversation(user_id: str, conv_index: int):
 
         # Sort the filtered metadata
         if sort_by == "user_messages":
-            filtered_metadata.sort(key=lambda x: x.get("user_message_count", 0), reverse=True)
+            filtered_metadata.sort(
+                key=lambda x: x.get("user_message_count", 0), reverse=True
+            )
         else:
             filtered_metadata.sort(key=lambda x: x.get("convo_start", ""))
 
         if conv_index < 0 or conv_index >= len(filtered_metadata):
-            return render_template("error.html", error=f"Invalid conversation index: {conv_index}")
+            return render_template(
+                "error.html", error=f"Invalid conversation index: {conv_index}"
+            )
 
         # Now load the full conversation data for the specific conversation
         target_conv_meta = filtered_metadata[conv_index]
@@ -509,9 +525,13 @@ def view_conversation(user_id: str, conv_index: int):
         conv_data = load_single_conversation(user_id, conv_id)
 
         if not conv_data:
-            return render_template("error.html", error=f"Conversation not found: {conv_id}")
+            return render_template(
+                "error.html", error=f"Conversation not found: {conv_id}"
+            )
 
-        enriched_conv_data = enrich_conversation_with_metadata(conv_id, conv_data, studio_metadata)
+        enriched_conv_data = enrich_conversation_with_metadata(
+            conv_id, conv_data, studio_metadata
+        )
         stats = calculate_conversation_stats(enriched_conv_data)
 
         # Get display parameters
@@ -571,7 +591,9 @@ def view_conversation(user_id: str, conv_index: int):
         )
 
     except FileNotFoundError:
-        return render_template("error.html", error=f"Trajectory data not found for user: {user_id}")
+        return render_template(
+            "error.html", error=f"Trajectory data not found for user: {user_id}"
+        )
     except Exception as e:
         return render_template("error.html", error=f"Error loading conversation: {e!s}")
 
@@ -631,7 +653,9 @@ def enrich_conversation_metadata(
     return enriched
 
 
-def calculate_conversation_stats_from_metadata(conv_meta: Dict[str, Any]) -> Dict[str, Any]:
+def calculate_conversation_stats_from_metadata(
+    conv_meta: Dict[str, Any]
+) -> Dict[str, Any]:
     """Calculate basic statistics from conversation metadata (without loading full events)."""
     start_time = conv_meta.get("convo_start", "Unknown")
     end_time = conv_meta.get("convo_end", "Unknown")
@@ -639,7 +663,9 @@ def calculate_conversation_stats_from_metadata(conv_meta: Dict[str, Any]) -> Dic
     stats = {
         "total_events": conv_meta.get("event_count", 0),
         "real_user_messages": conv_meta.get("user_message_count", 0),
-        "user_messages": conv_meta.get("user_message_count", 0),  # Template expects this
+        "user_messages": conv_meta.get(
+            "user_message_count", 0
+        ),  # Template expects this
         "agent_messages": 0,  # Can't calculate without loading events, default to 0
         "environment_messages": 0,  # Can't calculate without loading events, default to 0
         "system_messages": 0,  # Can't calculate without loading events, default to 0
@@ -657,9 +683,13 @@ def calculate_conversation_stats_from_metadata(conv_meta: Dict[str, Any]) -> Dic
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Web-based trajectory viewer")
-    parser.add_argument("--user-id", required=True, help="User ID to load trajectory data for")
+    parser.add_argument(
+        "--user-id", required=True, help="User ID to load trajectory data for"
+    )
     parser.add_argument("--host", default="127.0.0.1", help="Host to run the server on")
-    parser.add_argument("--port", type=int, default=5000, help="Port to run the server on")
+    parser.add_argument(
+        "--port", type=int, default=5000, help="Port to run the server on"
+    )
     parser.add_argument("--debug", action="store_true", help="Run in debug mode")
 
     args = parser.parse_args()
@@ -670,7 +700,9 @@ if __name__ == "__main__":
     # Validate that the user data exists
     data_path = Path(f"./data/processed_data/{TARGET_USER_ID}.json")
     if not data_path.exists():
-        print(f"Error: Trajectory data not found for user '{TARGET_USER_ID}' at {data_path}")
+        print(
+            f"Error: Trajectory data not found for user '{TARGET_USER_ID}' at {data_path}"
+        )
         sys.exit(1)
 
     print(
@@ -678,7 +710,9 @@ if __name__ == "__main__":
     )
     print("Available endpoints:")
     print(f"  - Main page: http://{args.host}:{args.port}/")
-    print(f"  - User conversations: http://{args.host}:{args.port}/user/{TARGET_USER_ID}")
+    print(
+        f"  - User conversations: http://{args.host}:{args.port}/user/{TARGET_USER_ID}"
+    )
     print(
         f"  - Specific conversation: http://{args.host}:{args.port}/user/{TARGET_USER_ID}/conversation/<index>"
     )

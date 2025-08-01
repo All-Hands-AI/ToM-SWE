@@ -9,7 +9,7 @@ and next action suggestions for SWE agents.
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Optional
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, status
@@ -31,18 +31,22 @@ logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 logger = logging.getLogger(__name__)
 
 # Ensure all tom_swe loggers use the same level
-for logger_name in ["tom_swe.generation_utils.generate", "tom_swe.tom_agent", "tom_swe.rag_module"]:
+for logger_name in [
+    "tom_swe.generation_utils.generate",
+    "tom_swe.tom_agent",
+    "tom_swe.rag_module",
+]:
     logging.getLogger(logger_name).setLevel(getattr(logging, log_level, logging.INFO))
 
 
-async def initialize_tom_agent() -> ToMAgent | None:
+async def initialize_tom_agent() -> Optional[ToMAgent]:
     """Initialize the ToM agent."""
     processed_data_dir = os.getenv("TOM_PROCESSED_DATA_DIR", "./data/processed_data")
     user_model_dir = os.getenv("TOM_USER_MODEL_DIR", "./data/user_model")
     enable_rag = os.getenv("TOM_ENABLE_RAG", "true").lower() in ("true", "1", "yes")
 
     try:
-        agent = await create_tom_agent(
+        agent = create_tom_agent(
             processed_data_dir=processed_data_dir,
             user_model_dir=user_model_dir,
             enable_rag=enable_rag,
@@ -106,12 +110,15 @@ async def health_check() -> HealthResponse:
     return HealthResponse(
         status="healthy",
         version="2.0.0",
-        tom_agent_ready=hasattr(app.state, "tom_agent") and app.state.tom_agent is not None,
+        tom_agent_ready=hasattr(app.state, "tom_agent")
+        and app.state.tom_agent is not None,
     )
 
 
 @app.post("/propose_instructions", response_model=ProposeInstructionsResponse)
-async def propose_instructions(request: ProposeInstructionsRequest) -> ProposeInstructionsResponse:
+async def propose_instructions(
+    request: ProposeInstructionsRequest,
+) -> ProposeInstructionsResponse:
     """
     Get improved, personalized instructions based on user context and preferences.
     """
@@ -124,14 +131,9 @@ async def propose_instructions(request: ProposeInstructionsRequest) -> ProposeIn
     try:
         logger.info(f"Generating instruction improvements for user {request.user_id}")
 
-        # Analyze user context and generate improved instructions
-        user_context = await app.state.tom_agent.analyze_user_context(
+        # Generate improved instructions
+        recommendation = app.state.tom_agent.propose_instructions(
             user_id=request.user_id,
-            current_query=request.context,
-        )
-
-        recommendations = await app.state.tom_agent.propose_instructions(
-            user_context=user_context,
             original_instruction=request.original_instruction,
             user_msg_context=request.context,
         )
@@ -139,9 +141,9 @@ async def propose_instructions(request: ProposeInstructionsRequest) -> ProposeIn
         return ProposeInstructionsResponse(
             user_id=request.user_id,
             original_instruction=request.original_instruction,
-            recommendations=recommendations,
+            recommendations=[recommendation],
             success=True,
-            message=f"Generated {len(recommendations)} instruction recommendations",
+            message="Generated instruction recommendation",
         )
 
     except Exception as e:

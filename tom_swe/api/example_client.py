@@ -42,7 +42,9 @@ class ToMAgentClient:
             "original_instruction": original_instruction,
             "context": context,
         }
-        response = await self.client.post(f"{self.base_url}/propose_instructions", json=data)
+        response = await self.client.post(
+            f"{self.base_url}/propose_instructions", json=data
+        )
         response.raise_for_status()
         return cast(Dict[str, Any], response.json())
 
@@ -56,7 +58,9 @@ class ToMAgentClient:
             "user_id": user_id,
             "context": context,
         }
-        response = await self.client.post(f"{self.base_url}/suggest_next_actions", json=data)
+        response = await self.client.post(
+            f"{self.base_url}/suggest_next_actions", json=data
+        )
         response.raise_for_status()
         return cast(Dict[str, Any], response.json())
 

@@ -15,7 +15,6 @@ Key Features:
 5. Integration with existing ToM and RAG infrastructure
 """
 
-import asyncio
 import logging
 import os
 import time
@@ -32,7 +31,10 @@ from tom_swe.database import (
     InstructionRecommendation,
     UserContext,
 )
-from tom_swe.generation_utils.generate import LLMConfig, call_llm_simple, call_llm_structured
+from tom_swe.generation_utils.generate import (
+    LLMConfig,
+    LLMClient,
+)
 from tom_swe.rag_module import RAGAgent, create_rag_agent
 from tom_swe.tom_module import UserMentalStateAnalyzer
 
@@ -48,7 +50,9 @@ logger = logging.getLogger(__name__)
 litellm.set_verbose = False
 
 # LLM configuration
-DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514")
+DEFAULT_LLM_MODEL = os.getenv(
+    "DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514"
+)
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
 LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
 
@@ -64,6 +68,8 @@ class ToMAgentConfig:
     user_model_dir: str = "./data/user_model"
     llm_model: Optional[str] = None
     enable_rag: bool = True
+    api_key: Optional[str] = None
+    api_base: Optional[str] = None
 
 
 @dataclass
@@ -97,16 +103,30 @@ class ToMAgent:
         self.llm_model = config.llm_model or DEFAULT_LLM_MODEL
         self.enable_rag = config.enable_rag
 
-        # Initialize ToM analyzer
+        # LLM configuration - use config values if provided, otherwise fallback to env vars
+        self.api_key = config.api_key or LITELLM_API_KEY
+        self.api_base = config.api_base or LITELLM_BASE_URL
+
+        # Create LLM client with our configuration
+        llm_config = LLMConfig(
+            model=self.llm_model,
+            api_key=self.api_key,
+            api_base=self.api_base,
+        )
+        self.llm_client = LLMClient(llm_config)
+
+        # Initialize ToM analyzer with LLM client
         self.tom_analyzer = UserMentalStateAnalyzer(
-            processed_data_dir=self.processed_data_dir, model=self.llm_model
+            processed_data_dir=self.processed_data_dir, llm_client=self.llm_client
         )
 
         # RAG agent will be initialized when needed (only if RAG is enabled)
         self._rag_agent: Optional[RAGAgent] = None
 
         rag_status = "enabled" if self.enable_rag else "disabled"
-        logger.info(f"ToM Agent initialized with model: {self.llm_model}, RAG: {rag_status}")
+        logger.info(
+            f"ToM Agent initialized with model: {self.llm_model}, RAG: {rag_status}"
+        )
 
     async def _get_rag_agent(self) -> RAGAgent:
         """Get or initialize the RAG agent."""
@@ -119,11 +139,11 @@ class ToMAgent:
             logger.info("RAG agent initialized successfully")
         return self._rag_agent
 
-    async def analyze_user_context(
+    def _analyze_user_context(
         self, user_id: str, current_query: Optional[str] = None
     ) -> UserContext:
         """
-        Analyze the current context for a user.
+        Analyze the current context for a user (synchronous internal method).
 
         Args:
             user_id: The user ID to analyze
@@ -134,14 +154,34 @@ class ToMAgent:
         """
         logger.info(f"Analyzing user context for {user_id}")
 
-        # Load user profile
-        user_analysis = await self.tom_analyzer.load_existing_user_profile(
-            user_id, self.user_model_dir
-        )
+        # Load user profile synchronously
+        try:
+            import asyncio
+
+            # Run the async method in the current event loop if possible, otherwise create new one
+            try:
+                loop = asyncio.get_running_loop()
+                # This is a temporary solution - ideally tom_analyzer should have sync methods
+                user_analysis = asyncio.run_coroutine_threadsafe(
+                    self.tom_analyzer.load_existing_user_profile(
+                        user_id, self.user_model_dir
+                    ),
+                    loop,
+                ).result()
+            except RuntimeError:
+                # No event loop running, safe to use asyncio.run
+                user_analysis = asyncio.run(
+                    self.tom_analyzer.load_existing_user_profile(
+                        user_id, self.user_model_dir
+                    )
+                )
+        except Exception as e:
+            logger.error(f"Error loading user profile: {e}")
+            user_analysis = None
 
         user_profile = None
-        recent_sessions = []
-        preferences = []
+        recent_sessions: List[Any] = []
+        preferences: List[str] = []
         mental_state_summary = ""
 
         if user_analysis:
@@ -161,83 +201,38 @@ class ToMAgent:
             mental_state_summary=mental_state_summary,
         )
 
-    async def _call_llm_structured(
+    def propose_instructions(
         self,
-        prompt: str,
-        output_type: Any,
-        temperature: float = 0.3,
-    ) -> Optional[Any]:
-        """Call the LLM with structured output using new generation utilities."""
-        if not LITELLM_API_KEY:
-            logger.error("LLM API key not configured")
-            return None
-
-        try:
-            config = LLMConfig(
-                model=self.llm_model,
-                temperature=temperature,
-                api_key=LITELLM_API_KEY,
-                api_base=LITELLM_BASE_URL,
-            )
-            result = await call_llm_structured(
-                prompt=prompt,
-                output_type=output_type,
-                config=config,
-            )
-            return result
-        except Exception as e:
-            logger.error(f"Error calling LLM with structured output: {e}")
-            return None
-
-    async def _call_llm_simple(
-        self,
-        prompt: str,
-        temperature: float = 0.3,
-        max_tokens: int = 1024,
-    ) -> Optional[str]:
-        """Call the LLM for simple text generation."""
-        if not LITELLM_API_KEY:
-            logger.error("LLM API key not configured")
-            return None
-
-        try:
-            config = LLMConfig(
-                model=self.llm_model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                api_key=LITELLM_API_KEY,
-                api_base=LITELLM_BASE_URL,
-            )
-            result = await call_llm_simple(
-                prompt=prompt,
-                config=config,
-            )
-            return result
-        except Exception as e:
-            logger.error(f"Error calling LLM: {e}")
-            return None
-
-    async def propose_instructions(
-        self,
-        user_context: UserContext,
+        user_id: str,
         original_instruction: str,
         user_msg_context: Optional[str] = None,
-    ) -> List[InstructionRecommendation]:
+    ) -> InstructionRecommendation:
         """
-        Propose improved instructions based on user context.
+        Propose improved instructions (synchronous).
 
         Args:
-            user_context: The user's current context
+            user_id: The user ID to analyze and generate instructions for
             original_instruction: The original instruction to improve
             user_msg_context: Optional user message context
 
         Returns:
-            List of instruction recommendations
+            Instruction recommendation
         """
-        logger.info(f"Proposing instructions for user {user_context.user_id}")
+        logger.info(f"Proposing instructions for user {user_id}")
 
-        # Get relevant user behavior from RAG (if enabled)
-        relevant_behavior = await self._get_relevant_behavior(original_instruction)
+        # Load user context first (handle default_user case)
+        if user_id == "default_user":
+            # Create minimal user context for default user
+            user_context = UserContext(user_id=user_id)
+        else:
+            # Load real user context for actual users
+            user_context = self._analyze_user_context(user_id, original_instruction)
+
+        # Get relevant user behavior from RAG (if enabled) - make this sync
+        if self.enable_rag:
+            relevant_behavior = self._get_relevant_behavior_sync(original_instruction)
+        else:
+            relevant_behavior = ""
 
         # Build prompt for instruction improvement
         prompt = self._build_better_instruction_prompt(
@@ -247,14 +242,21 @@ class ToMAgent:
         # DEBUG: Check prompt length before LLM call
         self._debug_large_prompt(prompt, user_context, relevant_behavior)
 
-        result = await self._call_llm_structured(
+        result = self.llm_client.call_structured_sync(
             prompt,
             output_type=InstructionImprovementResponse,
             temperature=0.2,
         )
         logger.info(f"🔍 PROPOSE_INSTRUCTIONS RESULT: {result}")
         if not result:
-            return []
+            # Return empty recommendation for failed calls
+            return InstructionRecommendation(
+                original_instruction=original_instruction,
+                improved_instruction=original_instruction,
+                reasoning="Failed to generate improvement",
+                confidence_score=0.0,
+                clarity_score=0.0,
+            )
 
         # Post-process the instruction with formatted output
         scores = InstructionScores(
@@ -268,15 +270,13 @@ class ToMAgent:
             scores=scores,
         )
 
-        return [
-            InstructionRecommendation(
-                original_instruction=original_instruction,
-                improved_instruction=final_instruction,
-                reasoning=result.reasoning,
-                confidence_score=result.confidence_score,
-                clarity_score=result.clarity_score,
-            )
-        ]
+        return InstructionRecommendation(
+            original_instruction=original_instruction,
+            improved_instruction=final_instruction,
+            reasoning=result.reasoning,
+            confidence_score=result.confidence_score,
+            clarity_score=result.clarity_score,
+        )
 
     def _format_proposed_instruction(
         self,
@@ -313,17 +313,19 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
 
         return final_instruction
 
-    async def _get_relevant_behavior(self, original_instruction: str) -> str:
-        """Get relevant user behavior from RAG if enabled."""
+    def _get_relevant_behavior_sync(self, original_instruction: str) -> str:
+        """Get relevant user behavior from RAG if enabled (synchronous)."""
         if not self.enable_rag:
             return "RAG disabled - using user context only"
 
         rag_start_time = time.time()
         logger.info("⏱️  Starting RAG retrieval for instruction improvement...")
 
-        rag_agent = await self._get_rag_agent()
+        rag_agent = self._get_rag_agent_sync()
         rag_init_time = time.time()
-        logger.info(f"⏱️  RAG agent initialization: {rag_init_time - rag_start_time:.2f}s")
+        logger.info(
+            f"⏱️  RAG agent initialization: {rag_init_time - rag_start_time:.2f}s"
+        )
 
         # Build direct query for user message search
         rag_query = original_instruction  # Search directly against user messages
@@ -364,7 +366,9 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
             behavior_parts.append(f"Context {i+1}:\n" + "\n".join(context_parts))
 
         relevant_behavior = (
-            "\n\n".join(behavior_parts) if behavior_parts else "No relevant patterns found"
+            "\n\n".join(behavior_parts)
+            if behavior_parts
+            else "No relevant patterns found"
         )
 
         total_rag_time = query_end_time - rag_start_time
@@ -373,6 +377,32 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
         logger.info(f"⏱️  Total RAG time for instructions: {total_rag_time:.2f}s")
 
         return relevant_behavior
+
+    def _get_rag_agent_sync(self) -> RAGAgent:
+        """Get or initialize the RAG agent (synchronous)."""
+        if self._rag_agent is None:
+            logger.info("Initializing RAG agent...")
+            import asyncio
+
+            try:
+                loop = asyncio.get_running_loop()
+                self._rag_agent = asyncio.run_coroutine_threadsafe(
+                    create_rag_agent(
+                        data_path=self.processed_data_dir,
+                        llm_model=self.llm_model,
+                    ),
+                    loop,
+                ).result()
+            except RuntimeError:
+                # No event loop running
+                self._rag_agent = asyncio.run(
+                    create_rag_agent(
+                        data_path=self.processed_data_dir,
+                        llm_model=self.llm_model,
+                    )
+                )
+            logger.info("RAG agent initialized successfully")
+        return self._rag_agent
 
     def _build_better_instruction_prompt(
         self,
@@ -389,6 +419,9 @@ Based on the following information, provide suggestions to help the agent better
 "{original_instruction}"
 
 ## Context
+### User Context:
+{user_context.model_dump_json(indent=2)}
+
 ### Current context (interactions happening before the original instruction, if any):
 ```
 {user_msg_context}
@@ -424,9 +457,13 @@ Please generate suggestions to help the **agent** (note that you are giving sugg
 
 
 # Convenience function for quick access
-async def create_tom_agent(
+def create_tom_agent(
     processed_data_dir: str = "./data/processed_data",
     user_model_dir: str = "./data/user_model",
+    llm_model: Optional[str] = None,
+    api_key: Optional[str] = None,
+    api_base: Optional[str] = None,
+    enable_rag: bool = True,
     **kwargs: Any,
 ) -> ToMAgent:
     """
@@ -435,53 +472,23 @@ async def create_tom_agent(
     Args:
         processed_data_dir: Directory containing processed user data
         user_model_dir: Directory containing user model data
+        llm_model: LLM model to use (defaults to DEFAULT_LLM_MODEL)
+        api_key: API key for LLM service (defaults to LITELLM_API_KEY env var)
+        api_base: Base URL for LLM service (defaults to LITELLM_BASE_URL env var)
+        enable_rag: Whether to enable RAG functionality
         **kwargs: Additional arguments for ToMAgent
 
     Returns:
         Initialized ToMAgent
     """
-    agent = ToMAgent(
-        config=ToMAgentConfig(
-            processed_data_dir=processed_data_dir, user_model_dir=user_model_dir, **kwargs
-        )
+    config = ToMAgentConfig(
+        processed_data_dir=processed_data_dir,
+        user_model_dir=user_model_dir,
+        llm_model=llm_model,
+        api_key=api_key,
+        api_base=api_base,
+        enable_rag=enable_rag,
+        **kwargs,
     )
+    agent = ToMAgent(config=config)
     return agent
-
-
-# Example usage
-if __name__ == "__main__":
-
-    async def main() -> None:
-        # Create ToM agent
-        agent = await create_tom_agent()
-
-        # Test user and instruction
-        user_id = "20d03f52-abb6-4414-b024-67cc89d53e12"
-        instruction = "Hi hiiiiiii"
-
-        print(f"Testing ToM Agent with user: {user_id}")
-        print(f"Original instruction: '{instruction}'")
-        print("=" * 60)
-
-        # Test propose_instructions specifically
-        print("\n1. Testing propose_instructions...")
-        user_context = await agent.analyze_user_context(user_id, instruction)
-        print(
-            f"✓ User context analyzed - Mental state: {user_context.mental_state_summary[:100] if user_context.mental_state_summary else 'No mental state found'}..."
-        )
-
-        instruction_recommendations = await agent.propose_instructions(
-            user_context, instruction, user_msg_context=""
-        )
-
-        print(f"✓ Generated {len(instruction_recommendations)} instruction recommendations")
-
-        if instruction_recommendations:
-            print("\nInstruction Improvements:")
-            for i, rec in enumerate(instruction_recommendations, 1):
-                print(f"\n--- Recommendation {i} ---")
-                print(f"Improved instruction:\n{rec.improved_instruction}")
-        else:
-            print("❌ No instruction recommendations generated")
-
-    asyncio.run(main())

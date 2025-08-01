@@ -380,13 +380,19 @@ def create_comprehensive_analysis(power_users_df, studio_df, processed_data_dir,
         ]
         # filter nan
         repos = [repo for repo in repos if pd.notna(repo)]
-        most_common_repo = Counter(repos).most_common(1)[0][0] if repos else "No repository"
+        most_common_repo = (
+            Counter(repos).most_common(1)[0][0] if repos else "No repository"
+        )
 
         # Get detailed session analysis from JSON data with GUI conversation IDs
-        json_stats = analyze_user_json_data(user_id, processed_data_dir, gui_conversation_ids)
+        json_stats = analyze_user_json_data(
+            user_id, processed_data_dir, gui_conversation_ids
+        )
 
         # Get n-gram analysis for this user's GUI sessions
-        ngram_stats = analyze_user_ngrams(user_id, processed_data_dir, gui_conversation_ids, n)
+        ngram_stats = analyze_user_ngrams(
+            user_id, processed_data_dir, gui_conversation_ids, n
+        )
 
         # Update overall n-gram statistics
         for ngram_tuple, count in ngram_stats["ngram_counts"].items():
@@ -395,14 +401,18 @@ def create_comprehensive_analysis(power_users_df, studio_df, processed_data_dir,
         total_overall_messages += ngram_stats["total_user_typed_messages"]
 
         # Calculate metrics using exact data from matched GUI sessions
-        avg_msg_per_session = json_stats["total_messages"] / max(json_stats["total_sessions"], 1)
+        avg_msg_per_session = json_stats["total_messages"] / max(
+            json_stats["total_sessions"], 1
+        )
         avg_user_msg_per_session = json_stats["user_messages"] / max(
             json_stats["total_sessions"], 1
         )
 
         # Calculate exact GUI session metrics
         if json_stats["gui_sessions"] > 0:
-            avg_msg_per_gui_session = json_stats["gui_total_messages"] / json_stats["gui_sessions"]
+            avg_msg_per_gui_session = (
+                json_stats["gui_total_messages"] / json_stats["gui_sessions"]
+            )
             avg_user_msg_per_gui_session = (
                 json_stats["gui_user_messages"] / json_stats["gui_sessions"]
             )
@@ -429,14 +439,18 @@ def create_comprehensive_analysis(power_users_df, studio_df, processed_data_dir,
                 "avg_user_msg_per_session": round(avg_user_msg_per_session, 2),
                 "avg_msg_per_gui_session": round(avg_msg_per_gui_session, 2),
                 "avg_user_msg_per_gui_session": round(avg_user_msg_per_gui_session, 2),
-                "avg_user_typed_per_gui_session": round(avg_user_typed_per_gui_session, 2),
+                "avg_user_typed_per_gui_session": round(
+                    avg_user_typed_per_gui_session, 2
+                ),
                 # N-gram analysis
                 "gui_user_typed_tokens": ngram_stats["total_tokens"],
                 "top_ngrams": top_ngrams_str,
                 # Additional useful metrics
                 "total_messages_analyzed": json_stats["total_messages"],
                 "user_typed_messages": json_stats["user_typed_messages"],
-                "micro_agent_triggered_messages": json_stats["micro_agent_triggered_messages"],
+                "micro_agent_triggered_messages": json_stats[
+                    "micro_agent_triggered_messages"
+                ],
             }
         )
 
@@ -984,7 +998,9 @@ def main():
     # Show top repositories by activity
     if repo_ngram_analysis:
         sorted_repos = sorted(
-            repo_ngram_analysis.items(), key=lambda x: x[1]["total_tokens"], reverse=True
+            repo_ngram_analysis.items(),
+            key=lambda x: x[1]["total_tokens"],
+            reverse=True,
         )
         print("Top 3 most active repositories by token count:")
         for i, (repo, data) in enumerate(sorted_repos[:3], 1):

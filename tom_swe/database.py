@@ -107,7 +107,9 @@ class InstructionImprovementResponse(BaseModel):
 class InstructionRecommendation(BaseModel):
     """Pydantic model for an instruction recommendation."""
 
-    original_instruction: str = Field(description="The original instruction that was improved")
+    original_instruction: str = Field(
+        description="The original instruction that was improved"
+    )
     improved_instruction: str = Field(
         description="The improved instruction personalized to the user, think hard about what users really want to achieve and output markdown bullet points format with question marks in the points that you are not sure about. (style: blue text, italic)"
     )

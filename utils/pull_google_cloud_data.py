@@ -36,7 +36,9 @@ def pull_google_cloud_data():
                 os.makedirs(session_dir, exist_ok=True)
 
                 # Use -r flag for recursive copy and ensure destination is a directory
-                subprocess.run(["gsutil", "-m", "cp", "-r", session_path, session_dir], check=True)
+                subprocess.run(
+                    ["gsutil", "-m", "cp", "-r", session_path, session_dir], check=True
+                )
                 print(f"Successfully pulled session {session_id}")
             except subprocess.CalledProcessError as e:
                 print(f"Error pulling session {session_id}: {e}")
@@ -91,7 +93,8 @@ def precise_pull(csv_file, max_users=None):
     for session_id in new_session_ids:
         try:
             subprocess.run(
-                ["gsutil", "-m", "cp", "-r", f"{base_source}/{session_id}/", data_dir], check=True
+                ["gsutil", "-m", "cp", "-r", f"{base_source}/{session_id}/", data_dir],
+                check=True,
             )
             print(f"Successfully pulled session {session_id}")
         except subprocess.CalledProcessError as e:

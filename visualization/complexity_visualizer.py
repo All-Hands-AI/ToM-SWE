@@ -67,7 +67,8 @@ def plot_complexity_distribution(analyses: List[Dict[str, Any]]) -> None:
 
     # Extract complexity values
     complexity_values = [
-        analysis.get("analysis", {}).get("cyclomatic_complexity", 1) for analysis in analyses
+        analysis.get("analysis", {}).get("cyclomatic_complexity", 1)
+        for analysis in analyses
     ]
 
     if not complexity_values:
@@ -309,11 +310,14 @@ def create_complexity_report(analyses: List[Dict[str, Any]]) -> str:
 
     # Extract complexity values
     complexity_values = [
-        analysis.get("analysis", {}).get("cyclomatic_complexity", 1) for analysis in analyses
+        analysis.get("analysis", {}).get("cyclomatic_complexity", 1)
+        for analysis in analyses
     ]
 
     # Calculate statistics
-    avg_complexity = sum(complexity_values) / len(complexity_values) if complexity_values else 0
+    avg_complexity = (
+        sum(complexity_values) / len(complexity_values) if complexity_values else 0
+    )
     max_complexity = max(complexity_values) if complexity_values else 0
     min_complexity = min(complexity_values) if complexity_values else 0
 
