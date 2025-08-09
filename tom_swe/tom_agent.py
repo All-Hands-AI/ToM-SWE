@@ -220,8 +220,7 @@ class ToMAgent:
         """
         logger.info(f"Proposing instructions for user {user_id}")
 
-        # Load user context first (handle default_user case)
-        if user_id == "default_user":
+        if not user_id:
             # Create minimal user context for default user
             user_context = UserContext(user_id=user_id)
         else:

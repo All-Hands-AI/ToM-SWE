@@ -31,6 +31,10 @@ from tom_swe.tom_agent import (
 from tom_swe.tom_module import (
     UserMentalStateAnalyzer,
 )
+from tom_swe.memory.conversation_processor import (
+    sleeptime_compute,
+    CleanSessionStore,
+)
 
 __version__ = "1.0.0"
 __author__ = "Research Team"
@@ -55,4 +59,6 @@ __all__ = [
     "create_tom_agent",
     "load_processed_data",
     "load_user_model_data",
+    "sleeptime_compute",
+    "CleanSessionStore",
 ]
