@@ -80,5 +80,5 @@ def load_user_model(user_id: str, file_store: FileStore) -> str:
     if file_store.exists(user_model_filename):
         user_model = file_store.read(user_model_filename)
     else:
-        user_model = "user model not exists needs to be initialized"
+        user_model = "none"
     return user_model

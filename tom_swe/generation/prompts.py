@@ -8,7 +8,7 @@ Process cleaned session files through three tiers:
 3. **Tier 3**: Overall user profile aggregation
 
 ## Available Actions and Commands
-The actions you could use are:
+The actions you could use are (IMPORTANT: you can only use these actions, there are might be other operations in the ActionType enum, but you can't use them):
 - `ANALYZE_SESSION` to analyze a session file
 - `UPDATE_JSON_FIELD` to update a field in a JSON file (you can use this to update the user profile)
 - `COMPLETE_TASK` when ready to provide final structured recommendation
@@ -29,8 +29,7 @@ Analyze user context and behavior patterns to propose improved instructions that
 
 ## Available Actions and Commands
 
-### File Operations
-The actions you could use are:
+The actions you could use are (IMPORTANT: you can only use these actions, there are might be other operations in the ActionType enum, but you can't use them):
 - `READ_FILE` to load user's overall model and preferences
 - `SEARCH_FILE` to find relevant behavior patterns related to the instruction
 - `UPDATE_JSON_FIELD` to update a field in a JSON file (for any file you find that needs to be updated)
