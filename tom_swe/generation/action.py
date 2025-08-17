@@ -10,8 +10,9 @@ import json
 import logging
 from typing import Any, Optional
 from datetime import datetime
-from tom_swe.generation.dataclass import ActionType
+
 from tom_swe.generation.dataclass import (
+    ActionType,
     ReadFileParams,
     SearchFileParams,
     UpdateJsonFieldParams,
@@ -19,6 +20,7 @@ from tom_swe.generation.dataclass import (
     InitializeUserProfileParams,
     RagSearchParams,
     CompleteTaskParams,
+    SessionAnalysis,
 )
 from tom_swe.memory.locations import (
     get_overall_user_model_filename,
@@ -28,7 +30,6 @@ from tom_swe.memory.locations import (
 )
 from tom_swe.memory.store import FileStore
 from tom_swe.memory.local import LocalFileStore
-from tom_swe.generation.dataclass import SessionAnalysis
 
 logger = logging.getLogger(__name__)
 

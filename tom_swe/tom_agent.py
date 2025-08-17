@@ -30,6 +30,9 @@ from dotenv import load_dotenv
 from tom_swe.generation.dataclass import (
     InstructionImprovementResponse,
     InstructionRecommendation,
+    AnalyzeSessionParams,
+    InitializeUserProfileParams,
+    CompleteTaskParams,
 )
 from tom_swe.generation import (
     SLEEP_TIME_COMPUTATION_PROMPT,
@@ -48,6 +51,8 @@ from tom_swe.memory.local import LocalFileStore
 from tom_swe.memory.locations import (
     get_cleaned_session_filename,
     get_overall_user_model_filename,
+    get_session_models_dir,
+    get_session_model_filename,
 )
 from tom_swe.memory.store import FileStore, load_user_model
 from tom_swe.utils import build_better_instruction_prompt, format_proposed_instruction
@@ -267,8 +272,6 @@ class ToMAgent:
         """Get or initialize the RAG agent (synchronous)."""
         if self._rag_agent is None:
             logger.info("Initializing RAG agent...")
-            import asyncio
-
             try:
                 loop = asyncio.get_running_loop()
                 self._rag_agent = asyncio.run_coroutine_threadsafe(
@@ -422,11 +425,6 @@ class ToMAgent:
         logger.info(f"📁 Cleaned sessions saved to: {cleaned_file_paths}")
 
         # Step 2: Find unprocessed sessions (exist in cleaned but not in session models)
-        from tom_swe.memory.locations import (
-            get_session_models_dir,
-            get_session_model_filename,
-        )
-
         cleaned_session_ids = [
             store.clean_session.session_id for store in clean_session_stores
         ]
@@ -440,8 +438,6 @@ class ToMAgent:
         preset_actions = []
         if unprocessed_sessions:
             # Step 3: Create preset action for batch processing unprocessed sessions
-            from tom_swe.generation.dataclass import AnalyzeSessionParams
-
             preset_actions += [
                 ActionResponse(
                     action=ActionType.ANALYZE_SESSION,
@@ -459,11 +455,6 @@ class ToMAgent:
             and self.file_store.exists(get_session_models_dir(user_id))
             and len(self.file_store.list(get_session_models_dir(user_id))) > 0
         ):
-            from tom_swe.generation.dataclass import (
-                InitializeUserProfileParams,
-                CompleteTaskParams,
-            )
-
             preset_actions += [
                 ActionResponse(
                     action=ActionType.INITIALIZE_USER_PROFILE,
