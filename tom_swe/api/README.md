@@ -232,7 +232,7 @@ The API is built using:
 The API integrates with the existing ToM agent infrastructure:
 - `ToMAgent`: Main agent class for personalized guidance
 - `RAGAgent`: Retrieval-augmented generation for user behavior patterns
-- `UserMentalStateAnalyzer`: User mental state analysis
+- `ToMAnalyzer`: User mental state analysis
 
 ## Files
 

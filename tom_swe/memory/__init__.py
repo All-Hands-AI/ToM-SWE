@@ -6,10 +6,12 @@ Key Components:
 - FileUserModelStore: File-based implementation backend for UserModelStore
 """
 
-from .store import UserModelStore
-from .file_store import FileUserModelStore
+from .store import UserModelStore, FileStore, load_user_model
+from .local import LocalFileStore
 
 __all__ = [
     "UserModelStore",
-    "FileUserModelStore",
+    "FileStore",
+    "LocalFileStore",
+    "load_user_model",
 ]

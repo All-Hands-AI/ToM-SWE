@@ -7,7 +7,7 @@ and provides both async and sync methods for structured LLM calls.
 import logging
 import os
 from dataclasses import dataclass
-from typing import Optional, Type, TypeVar
+from typing import Optional, Type, TypeVar, List, Dict
 
 from litellm import acompletion, completion
 from pydantic import BaseModel
@@ -186,9 +186,9 @@ class LLMClient:
                     f"Failed to parse output even after reformatting. Original error: {parse_error}, Fallback error: {fallback_error}"
                 ) from parse_error
 
-    def call_structured_sync(
+    def call_structured_messages(
         self,
-        prompt: str,
+        messages: List[Dict[str, str]],
         output_type: Type[T],
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
@@ -208,16 +208,16 @@ class LLMClient:
         # Create output parser
         output_parser = PydanticOutputParser(output_type)
 
-        # Construct the full prompt with schema instructions
+        # Construct the full messages list with schema instructions
         format_instructions = output_parser.get_format_instructions()
-        full_prompt = f"{prompt}\n\n{format_instructions}"
+        full_messages = messages + [{"role": "user", "content": format_instructions}]
 
-        logger.info(f"Full prompt {len(full_prompt)} characters")
+        logger.info(f"Full prompt {len(full_messages)} messages")
 
         # Prepare completion arguments
         completion_args = {
             "model": self.config.model,
-            "messages": [{"role": "user", "content": full_prompt}],
+            "messages": full_messages,
             "temperature": temperature or self.config.temperature,
             "max_tokens": max_tokens or self.config.max_tokens,
         }

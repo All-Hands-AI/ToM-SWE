@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from ..database import (
+from ..generation.dataclass import (
     InstructionRecommendation,
 )
 

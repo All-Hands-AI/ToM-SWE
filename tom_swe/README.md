@@ -56,10 +56,10 @@ tom-analyze
 #### Synchronous Usage (Legacy)
 
 ```python
-from tom_module import UserMentalStateAnalyzer
+from tom_module import ToMAnalyzer
 
 # Initialize analyzer
-analyzer = UserMentalStateAnalyzer(
+analyzer = ToMAnalyzer(
     processed_data_dir="./data/processed_data",
     model="gpt-4o-mini"
 )
@@ -75,11 +75,11 @@ if result:
 
 ```python
 import asyncio
-from tom_module.tom_module import UserMentalStateAnalyzer
+from tom_module.tom_module import ToMAnalyzer
 
 async def analyze_user():
     # Initialize analyzer
-    analyzer = UserMentalStateAnalyzer(
+    analyzer = ToMAnalyzer(
         processed_data_dir="./data/processed_data",
         model="gpt-4o-mini"
     )
@@ -130,10 +130,10 @@ asyncio.run(quick_analysis())
 
 ```python
 import asyncio
-from tom_module.tom_module import UserMentalStateAnalyzer
+from tom_module.tom_module import ToMAnalyzer
 
 async def process_multiple_users():
-    analyzer = UserMentalStateAnalyzer("./data/processed_data")
+    analyzer = ToMAnalyzer("./data/processed_data")
 
     user_ids = ["user1", "user2", "user3"]
 
@@ -222,9 +222,9 @@ For each user, the module generates:
 The module supports any model available through litellm:
 
 ```python
-analyzer = UserMentalStateAnalyzer(model="gpt-4")  # OpenAI
-analyzer = UserMentalStateAnalyzer(model="claude-3-sonnet")  # Anthropic
-analyzer = UserMentalStateAnalyzer(model="gemini-pro")  # Google
+analyzer = ToMAnalyzer(model="gpt-4")  # OpenAI
+analyzer = ToMAnalyzer(model="claude-3-sonnet")  # Anthropic
+analyzer = ToMAnalyzer(model="gemini-pro")  # Google
 ```
 
 ### Environment Variables

@@ -1,8 +1,11 @@
 import json
-from typing import Generic, Type, TypeVar
+import logging
+from typing import Generic, Type, TypeVar, Optional
 
 import json_repair
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 OutputType = TypeVar("OutputType", bound=object)
 T = TypeVar("T", bound=BaseModel)
@@ -77,3 +80,89 @@ def split_text_for_embedding(text: str, max_tokens: int = 8191) -> list[str]:
             start = end
 
         return chunks
+
+
+def debug_large_prompt(
+    prompt: str, user_context: Optional[object] = None, relevant_behavior: str = ""
+) -> None:
+    """Debug large prompts by logging details and saving to file."""
+    prompt_length = len(prompt)
+
+    if prompt_length > 50000:  # If prompt is suspiciously large
+        logger.warning(f"⚠️  LARGE PROMPT DETECTED: {prompt_length:,} characters")
+
+        if user_context and hasattr(user_context, "mental_state_summary"):
+            logger.info(
+                f"  - Mental state summary length: {len(user_context.mental_state_summary or ''):,}"
+            )
+        if user_context and hasattr(user_context, "preferences"):
+            logger.info(f"  - Preferences count: {len(user_context.preferences or [])}")
+
+        logger.info(f"  - RAG behavior snippet: {relevant_behavior[:200]}...")
+
+        # Save full prompt to file for inspection
+        with open("/tmp/large_prompt_debug.txt", "w") as f:
+            f.write(prompt)
+        logger.info("  - Full prompt saved to /tmp/large_prompt_debug.txt")
+
+
+def build_better_instruction_prompt(
+    original_instruction: str,
+    user_msg_context: str,
+    user_model: str,
+) -> str:
+    """Build the prompt for instruction improvement."""
+    return f"""
+Based on the following information, provide suggestions to help the agent better understand and help the user.
+
+## Original Current User Instruction:
+{original_instruction}
+
+## Context
+### User Context:
+Here is the content of the user model (`overall_user_model.json`):
+{user_model}
+
+### Current context (interactions happening before the original instruction, if any):
+```
+{user_msg_context}
+```
+"""
+
+
+def format_proposed_instruction(
+    original_instruction: str,
+    improved_instruction: str,
+    reasoning: str,
+    confidence_score: float,
+    clarity_score: float,
+) -> str:
+    """
+    Format the proposed instruction with clarity analysis and interpretation.
+
+    Args:
+        original_instruction: The user's original message
+        improved_instruction: The AI's interpretation of what user meant
+        reasoning: Reasoning for the interpretation
+        confidence_score: Confidence score (0-1) for the suggestions
+        clarity_score: Clarity score (0-1) for the original instruction
+
+    Returns:
+        Formatted instruction with analysis and clarification request
+    """
+
+    final_instruction = f"""The user's original message was: '{original_instruction}'
+*****************ToM Agent Analysis Start Here*****************
+(ToM agent reasoning is not from the actual user, but aims to help you better understand the user's intent)
+The clarity score of the original message was: {clarity_score*100:.0f}%, (here's the reasoning: {reasoning}).
+
+Based on the conversation context and user patterns, here's a suggestion to help you better understand and help the user:
+
+## Action Suggestions (IMPORTANT!)
+{improved_instruction}
+
+## Confidence in the suggestions
+The ToM agent is {confidence_score*100:.0f}% confident in the suggestions.
+"""
+
+    return final_instruction

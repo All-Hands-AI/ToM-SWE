@@ -18,6 +18,7 @@ Key Features:
 import logging
 import os
 import time
+import asyncio
 from dataclasses import dataclass
 from typing import Any, List, Optional
 
@@ -26,17 +27,30 @@ import litellm
 from dotenv import load_dotenv
 
 # Local imports
-from tom_swe.database import (
+from tom_swe.generation.dataclass import (
     InstructionImprovementResponse,
     InstructionRecommendation,
-    UserContext,
 )
-from tom_swe.generation_utils.generate import (
+from tom_swe.generation import (
+    SLEEP_TIME_COMPUTATION_PROMPT,
+    PROPOSE_INSTRUCTIONS_PROMPT,
     LLMConfig,
     LLMClient,
+    ActionType,
+    ActionResponse,
+    SleepTimeResponse,
+    ActionExecutor,
 )
 from tom_swe.rag_module import RAGAgent, create_rag_agent
-from tom_swe.tom_module import UserMentalStateAnalyzer
+from tom_swe.tom_module import ToMAnalyzer
+from tom_swe.memory.conversation_processor import clean_sessions
+from tom_swe.memory.local import LocalFileStore
+from tom_swe.memory.locations import (
+    get_cleaned_session_filename,
+    get_overall_user_model_filename,
+)
+from tom_swe.memory.store import FileStore, load_user_model
+from tom_swe.utils import build_better_instruction_prompt, format_proposed_instruction
 
 # Load environment variables
 load_dotenv()
@@ -64,20 +78,11 @@ __all__ = ["ToMAgent", "ToMAgentConfig", "create_tom_agent"]
 class ToMAgentConfig:
     """Configuration for ToM Agent."""
 
-    processed_data_dir: str = "./data/processed_data"
-    user_model_dir: str = "./data/user_model"
+    file_store: Optional[FileStore] = None
     llm_model: Optional[str] = None
-    enable_rag: bool = True
+    enable_rag: bool = False
     api_key: Optional[str] = None
     api_base: Optional[str] = None
-
-
-@dataclass
-class InstructionScores:
-    """Scores for instruction analysis."""
-
-    confidence_score: float
-    clarity_score: float
 
 
 class ToMAgent:
@@ -98,14 +103,13 @@ class ToMAgent:
         if config is None:
             config = ToMAgentConfig()
 
-        self.processed_data_dir = config.processed_data_dir
-        self.user_model_dir = config.user_model_dir
         self.llm_model = config.llm_model or DEFAULT_LLM_MODEL
         self.enable_rag = config.enable_rag
 
         # LLM configuration - use config values if provided, otherwise fallback to env vars
         self.api_key = config.api_key or LITELLM_API_KEY
         self.api_base = config.api_base or LITELLM_BASE_URL
+        self.file_store = config.file_store or LocalFileStore(root="~/.openhands")
 
         # Create LLM client with our configuration
         llm_config = LLMConfig(
@@ -115,100 +119,33 @@ class ToMAgent:
         )
         self.llm_client = LLMClient(llm_config)
 
-        # Initialize ToM analyzer with LLM client
-        self.tom_analyzer = UserMentalStateAnalyzer(
-            processed_data_dir=self.processed_data_dir, llm_client=self.llm_client
+        # Initialize ToM analyzer with LLM client and FileStore
+        self.tom_analyzer = ToMAnalyzer(
+            llm_client=self.llm_client,
+            user_id="",  # Default to empty string as per the new API
         )
 
         # RAG agent will be initialized when needed (only if RAG is enabled)
         self._rag_agent: Optional[RAGAgent] = None
+
+        # Initialize action executor with reference to this agent
+        self.action_executor = ActionExecutor(
+            agent_context=self, file_store=self.file_store
+        )
 
         rag_status = "enabled" if self.enable_rag else "disabled"
         logger.info(
             f"ToM Agent initialized with model: {self.llm_model}, RAG: {rag_status}"
         )
 
-    async def _get_rag_agent(self) -> RAGAgent:
-        """Get or initialize the RAG agent."""
-        if self._rag_agent is None:
-            logger.info("Initializing RAG agent...")
-            self._rag_agent = await create_rag_agent(
-                data_path=self.processed_data_dir,
-                llm_model=self.llm_model,
-            )
-            logger.info("RAG agent initialized successfully")
-        return self._rag_agent
-
-    def _analyze_user_context(
-        self, user_id: str, current_query: Optional[str] = None
-    ) -> UserContext:
-        """
-        Analyze the current context for a user (synchronous internal method).
-
-        Args:
-            user_id: The user ID to analyze
-            current_query: Optional current query/task the user is working on
-
-        Returns:
-            UserContext object with user's current state
-        """
-        logger.info(f"Analyzing user context for {user_id}")
-
-        # Load user profile synchronously
-        try:
-            import asyncio
-
-            # Run the async method in the current event loop if possible, otherwise create new one
-            try:
-                loop = asyncio.get_running_loop()
-                # This is a temporary solution - ideally tom_analyzer should have sync methods
-                user_analysis = asyncio.run_coroutine_threadsafe(
-                    self.tom_analyzer.load_existing_user_profile(
-                        user_id, self.user_model_dir
-                    ),
-                    loop,
-                ).result()
-            except RuntimeError:
-                # No event loop running, safe to use asyncio.run
-                user_analysis = asyncio.run(
-                    self.tom_analyzer.load_existing_user_profile(
-                        user_id, self.user_model_dir
-                    )
-                )
-        except Exception as e:
-            logger.error(f"Error loading user profile: {e}")
-            user_analysis = None
-
-        user_profile = None
-        recent_sessions: List[Any] = []
-        preferences: List[str] = []
-        mental_state_summary = ""
-
-        if user_analysis:
-            user_profile = user_analysis.user_profile
-            recent_sessions = user_analysis.session_summaries[-5:]  # Last 5 sessions
-            preferences = user_profile.preference_summary or []
-            mental_state_summary = user_profile.overall_description or ""
-        else:
-            logger.warning(f"No user profile found for {user_id}")
-
-        return UserContext(
-            user_id=user_id,
-            user_profile=user_profile,
-            recent_sessions=recent_sessions,
-            current_query=current_query,
-            preferences=preferences,
-            mental_state_summary=mental_state_summary,
-        )
-
     def propose_instructions(
         self,
         user_id: str,
         original_instruction: str,
-        user_msg_context: Optional[str] = None,
+        user_msg_context: str = "",
     ) -> InstructionRecommendation:
         """
-        Propose improved instructions (synchronous).
+        Propose improved instructions using workflow controller.
 
         Args:
             user_id: The user ID to analyze and generate instructions for
@@ -218,34 +155,21 @@ class ToMAgent:
         Returns:
             Instruction recommendation
         """
-        logger.info(f"Proposing instructions for user {user_id}")
+        logger.info(f"🎯 Proposing instructions for user {user_id}")
 
-        if not user_id:
-            # Create minimal user context for default user
-            user_context = UserContext(user_id=user_id)
-        else:
-            # Load real user context for actual users
-            user_context = self._analyze_user_context(user_id, original_instruction)
-
-        # Get relevant user behavior from RAG (if enabled) - make this sync
-        if self.enable_rag:
-            relevant_behavior = self._get_relevant_behavior_sync(original_instruction)
-        else:
-            relevant_behavior = ""
-
-        # Build prompt for instruction improvement
-        prompt = self._build_better_instruction_prompt(
-            user_context, original_instruction, relevant_behavior, user_msg_context
+        # Build comprehensive prompt for instruction improvement
+        user_model = load_user_model(user_id, self.file_store)
+        prompt = build_better_instruction_prompt(
+            original_instruction, user_msg_context, user_model
         )
 
-        # DEBUG: Check prompt length before LLM call
-        self._debug_large_prompt(prompt, user_context, relevant_behavior)
-
-        result = self.llm_client.call_structured_sync(
-            prompt,
-            output_type=InstructionImprovementResponse,
-            temperature=0.2,
+        # Use workflow controller with final structured output
+        result = self._step(
+            prompt=prompt,
+            final_response_model=InstructionImprovementResponse,  # Final structured output
+            system_prompt=PROPOSE_INSTRUCTIONS_PROMPT,
         )
+
         logger.info(f"🔍 PROPOSE_INSTRUCTIONS RESULT: {result}")
         if not result:
             # Return empty recommendation for failed calls
@@ -258,15 +182,12 @@ class ToMAgent:
             )
 
         # Post-process the instruction with formatted output
-        scores = InstructionScores(
-            confidence_score=result.confidence_score,
-            clarity_score=result.clarity_score,
-        )
-        final_instruction = self._format_proposed_instruction(
+        final_instruction = format_proposed_instruction(
             original_instruction=original_instruction,
             improved_instruction=result.improved_instruction,
             reasoning=result.reasoning,
-            scores=scores,
+            confidence_score=result.confidence_score,
+            clarity_score=result.clarity_score,
         )
 
         return InstructionRecommendation(
@@ -277,41 +198,6 @@ class ToMAgent:
             clarity_score=result.clarity_score,
         )
 
-    def _format_proposed_instruction(
-        self,
-        original_instruction: str,
-        improved_instruction: str,
-        reasoning: str,
-        scores: InstructionScores,
-    ) -> str:
-        """
-        Format the proposed instruction with clarity analysis and interpretation.
-
-        Args:
-            original_instruction: The user's original message
-            improved_instruction: The AI's interpretation of what user meant
-            reasoning: Reasoning for the interpretation
-            scores: Scores containing confidence and clarity values
-
-        Returns:
-            Formatted instruction with analysis and clarification request
-        """
-        final_instruction = f"""The user's original message was: '{original_instruction}'
-*****************ToM Agent Analysis Start Here*****************
-(ToM agent reasoning is not from the actual user, but aims to help you better understand the user's intent)
-The clarity score of the original message was: {scores.clarity_score*100:.0f}%, (here's the reasoning: {reasoning}).
-
-Based on the conversation context and user patterns, here's a suggestion to help you better understand and help the user:
-
-## Action Suggestions (IMPORTANT!)
-{improved_instruction}
-
-## Confidence in the suggestions
-The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions.
-"""
-
-        return final_instruction
-
     def _get_relevant_behavior_sync(self, original_instruction: str) -> str:
         """Get relevant user behavior from RAG if enabled (synchronous)."""
         if not self.enable_rag:
@@ -320,7 +206,7 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
         rag_start_time = time.time()
         logger.info("⏱️  Starting RAG retrieval for instruction improvement...")
 
-        rag_agent = self._get_rag_agent_sync()
+        rag_agent = self._get_rag_module_sync()
         rag_init_time = time.time()
         logger.info(
             f"⏱️  RAG agent initialization: {rag_init_time - rag_start_time:.2f}s"
@@ -377,7 +263,7 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
 
         return relevant_behavior
 
-    def _get_rag_agent_sync(self) -> RAGAgent:
+    def _get_rag_module_sync(self) -> RAGAgent:
         """Get or initialize the RAG agent (synchronous)."""
         if self._rag_agent is None:
             logger.info("Initializing RAG agent...")
@@ -387,7 +273,6 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
                 loop = asyncio.get_running_loop()
                 self._rag_agent = asyncio.run_coroutine_threadsafe(
                     create_rag_agent(
-                        data_path=self.processed_data_dir,
                         llm_model=self.llm_model,
                     ),
                     loop,
@@ -396,63 +281,226 @@ The ToM agent is {scores.confidence_score*100:.0f}% confident in the suggestions
                 # No event loop running
                 self._rag_agent = asyncio.run(
                     create_rag_agent(
-                        data_path=self.processed_data_dir,
                         llm_model=self.llm_model,
                     )
                 )
             logger.info("RAG agent initialized successfully")
         return self._rag_agent
 
-    def _build_better_instruction_prompt(
+    def _step(
         self,
-        user_context: UserContext,
-        original_instruction: str,
-        relevant_behavior: str,
-        user_msg_context: Optional[str],
-    ) -> str:
-        """Build the prompt for instruction improvement."""
-        return f"""
-Based on the following information, provide suggestions to help the agent better understand and help the user.
+        prompt: str,
+        response_model: type = ActionResponse,
+        final_response_model: Optional[type] = None,
+        system_prompt: Optional[str] = None,
+        max_iterations: int = 3,
+        preset_actions: Optional[List[Any]] = None,
+    ) -> Any:
+        """
+        Generic workflow controller with optional final response model.
 
-## Original Current User Instruction:
-"{original_instruction}"
+        Args:
+            prompt: The main task prompt
+            response_model: Pydantic model for intermediate workflow steps
+            final_response_model: Optional final response model for structured output
+            system_prompt: Optional system prompt (auto-generated if not provided)
+            max_iterations: Maximum workflow iterations
+            preset_actions: Optional list of pre-set actions to execute before LLM decisions
 
-## Context
-### User Context:
-{user_context.model_dump_json(indent=2)}
+        Returns:
+            Final result - either from final_response_model or last action result
+        """
+        if not system_prompt:
+            # Auto-generate system prompt based on available actions
+            system_prompt = "You are a helpful assistant."
 
-### Current context (interactions happening before the original instruction, if any):
-```
-{user_msg_context}
-```
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ]
 
-### Past context--Relevant Past User Interaction with the Agent:
-(Note the past context is automatically retrieved from the RAG agent. RAG agent could make mistakes, so use this with caution.)
-```
-{relevant_behavior}
-```
+        logger.info(f"🤖 Starting workflow with {max_iterations} max iterations")
+        logger.debug(f"Initial messages: {messages}")
 
-Please generate suggestions to help the **agent** (note that you are giving suggestions to the agent, not the user) better understand and help the **user** (following the format below).
-"""
+        for iteration in range(max_iterations):
+            logger.info(f"🔄 Workflow iteration {iteration + 1}/{max_iterations}")
 
-    def _debug_large_prompt(
-        self, prompt: str, user_context: UserContext, relevant_behavior: str
-    ) -> None:
-        """Debug large prompts by logging details and saving to file."""
-        prompt_length = len(prompt)
+            # Use preset actions first, then fall back to LLM
+            if preset_actions:
+                response = preset_actions.pop(0)  # Take first preset action
+                logger.info(f"🎯 Using preset action: {response.action.value}")
+            else:
+                # Structured call with Pydantic model for intermediate steps
+                response = self.llm_client.call_structured_messages(
+                    messages=messages, output_type=response_model, temperature=0.1
+                )
 
-        if prompt_length > 50000:  # If prompt is suspiciously large
-            logger.warning(f"⚠️  LARGE PROMPT DETECTED: {prompt_length:,} characters")
-            logger.info(
-                f"  - Mental state summary length: {len(user_context.mental_state_summary or ''):,}"
+            if not response:
+                logger.error("❌ No response from LLM")
+                break
+
+            # Type-safe access to structured response
+            logger.info(f"🧠 Agent reasoning: {response.reasoning}")
+            logger.info(f"⚡ Agent action: {response.action.value}")
+
+            # Execute the action using ActionExecutor
+            result = self.action_executor.execute_action(
+                response.action, response.parameters
             )
-            logger.info(f"  - Preferences count: {len(user_context.preferences or [])}")
-            logger.info(f"  - RAG behavior snippet: {relevant_behavior[:200]}...")
 
-            # Save full prompt to file for inspection
-            with open("/tmp/large_prompt_debug.txt", "w") as f:
-                f.write(prompt)
-            logger.info("  - Full prompt saved to /tmp/large_prompt_debug.txt")
+            # Update conversation
+            messages.extend(
+                [
+                    {
+                        "role": "assistant",
+                        "content": f"Action: {response.action.value}, Reasoning: {response.reasoning}",
+                    },
+                    {"role": "user", "content": f"Tool result: {result}"},
+                ]
+            )
+
+            # Check if workflow is complete
+            if response.is_complete:
+                logger.info("✅ Workflow completed successfully")
+
+                # If final_response_model specified, make final structured call
+                if final_response_model:
+                    logger.info(
+                        f"🎯 Making final call with {final_response_model.__name__}"
+                    )
+                    final_result: Any = self.llm_client.call_structured_messages(
+                        messages=messages
+                        + [
+                            {
+                                "role": "assistant",
+                                "content": "Ready to provide final structured result",
+                            }
+                        ],
+                        output_type=final_response_model,
+                        temperature=0.1,
+                    )
+                    return final_result
+                else:
+                    # No final model needed, return action result
+                    return result
+
+        logger.warning(f"⚠️  Workflow reached max iterations ({max_iterations})")
+        return result
+
+    def sleeptime_compute(
+        self,
+        sessions_data: List[dict[str, Any]],
+        user_id: str = "",
+    ) -> None:
+        """
+        Process sessions through the three-tier memory system using workflow controller.
+
+        Args:
+            sessions_data: Raw session data to process
+            user_id: User identifier
+            file_store: OpenHands FileStore object (optional)
+        """
+        logger.info(
+            f"🔄 Starting sleeptime_compute workflow for {len(sessions_data)} sessions"
+        )
+
+        # Step 1: Pre-process sessions to get cleaned session files
+        clean_session_stores = clean_sessions(sessions_data, self.file_store)
+
+        # Save all cleaned sessions and collect their file paths
+        async def _save_all() -> List[str]:
+            await asyncio.gather(
+                *(store.save(user_id) for store in clean_session_stores)
+            )
+            # Return list of file paths where sessions were saved
+            return [
+                get_cleaned_session_filename(store.clean_session.session_id, user_id)
+                for store in clean_session_stores
+            ]
+
+        cleaned_file_paths = asyncio.run(_save_all())
+        logger.info(f"📁 Cleaned sessions saved to: {cleaned_file_paths}")
+
+        # Step 2: Find unprocessed sessions (exist in cleaned but not in session models)
+        from tom_swe.memory.locations import (
+            get_session_models_dir,
+            get_session_model_filename,
+        )
+
+        cleaned_session_ids = [
+            store.clean_session.session_id for store in clean_session_stores
+        ]
+        # Find sessions that don't have corresponding model files
+        unprocessed_sessions = []
+        for session_id in cleaned_session_ids:
+            model_file = get_session_model_filename(session_id, user_id)
+            if not self.file_store.exists(model_file):
+                unprocessed_sessions.append(session_id)
+
+        preset_actions = []
+        if unprocessed_sessions:
+            # Step 3: Create preset action for batch processing unprocessed sessions
+            from tom_swe.generation.dataclass import AnalyzeSessionParams
+
+            preset_actions += [
+                ActionResponse(
+                    action=ActionType.ANALYZE_SESSION,
+                    parameters=AnalyzeSessionParams(
+                        user_id=user_id,
+                        session_batch=unprocessed_sessions,
+                    ),
+                    reasoning=f"Pre-configured batch processing of {len(unprocessed_sessions)} unprocessed sessions",
+                    is_complete=False,
+                )
+            ]
+
+        if (
+            not self.file_store.exists(get_overall_user_model_filename(user_id))
+            and self.file_store.exists(get_session_models_dir(user_id))
+            and len(self.file_store.list(get_session_models_dir(user_id))) > 0
+        ):
+            from tom_swe.generation.dataclass import (
+                InitializeUserProfileParams,
+                CompleteTaskParams,
+            )
+
+            preset_actions += [
+                ActionResponse(
+                    action=ActionType.INITIALIZE_USER_PROFILE,
+                    parameters=InitializeUserProfileParams(
+                        user_id=user_id,
+                    ),
+                    reasoning="Pre-configured saving of updated user profile",
+                    is_complete=False,
+                ),
+                ActionResponse(
+                    action=ActionType.COMPLETE_TASK,
+                    parameters=CompleteTaskParams(
+                        result="User profile initialized",
+                    ),
+                    reasoning="Pre-configured saving of updated user profile",
+                ),
+            ]
+
+        user_model = load_user_model(user_id, self.file_store)
+
+        # Step 4: Use workflow controller with preset actions
+        final_result = self._step(
+            prompt=f"""
+Here is the content of the user model (`overall_user_model.json`):
+{user_model}
+I have {len(unprocessed_sessions)} unprocessed session files that need batch processing:
+
+Session IDs to process: {unprocessed_sessions}
+
+Complete the three-tier user modeling system by processing these sessions and updating the overall user profile.
+            """.strip(),
+            final_response_model=SleepTimeResponse,
+            system_prompt=SLEEP_TIME_COMPUTATION_PROMPT,
+            preset_actions=preset_actions,
+            max_iterations=10,
+        )
+        logger.info(f"🔄 Final result: {final_result}")
 
 
 # Convenience function for quick access
@@ -481,8 +529,6 @@ def create_tom_agent(
         Initialized ToMAgent
     """
     config = ToMAgentConfig(
-        processed_data_dir=processed_data_dir,
-        user_model_dir=user_model_dir,
         llm_model=llm_model,
         api_key=api_key,
         api_base=api_base,

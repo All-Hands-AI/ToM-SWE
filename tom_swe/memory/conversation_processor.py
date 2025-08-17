@@ -5,11 +5,11 @@ Simple low-level conversation processor with sleeptime computation.
 import json
 import re
 from dataclasses import dataclass, asdict
-from pathlib import Path
 from typing import Dict, List, Any, Optional, Callable, TypeVar
 from .store import UserModelStore
 from .locations import get_cleaned_session_filename
-
+from .local import LocalFileStore
+from datetime import datetime
 
 T = TypeVar("T")
 
@@ -28,8 +28,11 @@ class CleanSession:
     """Clean session object similar to FileUserModelStore format."""
 
     session_id: str
+    start_time: str
+    end_time: str
     messages: List[CleanMessage]
     user_id: str = ""
+    last_updated: str = ""
 
 
 def _clean_user_message(content: str) -> str:
@@ -109,35 +112,20 @@ def clean_sessions(
 
         clean_session = CleanSession(
             session_id=session_id,
+            start_time=session_data.get("start_time", ""),
+            end_time=session_data.get("end_time", ""),
             messages=clean_messages,
+            last_updated=datetime.now().isoformat(),
         )
 
         # Create CleanSessionStore for this session
         store = CleanSessionStore(
-            file_store=file_store or LocalFileStore(), clean_session=clean_session
+            file_store=file_store or LocalFileStore(root="~/.openhands"),
+            clean_session=clean_session,
         )
         clean_session_stores.append(store)
 
     return clean_session_stores
-
-
-class LocalFileStore:
-    """Local FileStore implementation as fallback when OpenHands FileStore not available."""
-
-    def write(self, path: str, content: str) -> None:
-        """Write content to file."""
-        file_path = Path(path)
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(file_path, "w") as f:
-            f.write(content)
-
-    def read(self, path: str) -> str:
-        """Read content from file."""
-        file_path = Path(path)
-        if not file_path.exists():
-            raise FileNotFoundError(f"File not found: {path}")
-        with open(file_path, "r") as f:
-            return f.read()
 
 
 @dataclass
@@ -189,36 +177,9 @@ class CleanSessionStore(UserModelStore):
         """Get a clean session store instance."""
         file_store = getattr(config, "file_store", None) if config else None
         if not file_store:
-            file_store = LocalFileStore()
+            file_store = LocalFileStore("~/.openhands")
         # Need a clean_session - this would be provided differently
-        clean_session = CleanSession("", [])
+        clean_session = CleanSession(
+            session_id="", start_time="", end_time="", messages=[]
+        )
         return cls(file_store=file_store, clean_session=clean_session)
-
-
-def sleeptime_compute(
-    sessions_data: List[Dict[str, Any]],
-    user_id: str = "",
-    file_store: Optional[Any] = None,
-) -> List[CleanSessionStore]:
-    """
-    Process sessions, automatically save them, and return CleanSessionStore objects.
-
-    Args:
-        sessions_data: Raw session data to process
-        user_id: User identifier
-        file_store: OpenHands FileStore object (optional)
-
-    Returns:
-        List of CleanSessionStore objects (already saved)
-    """
-    import asyncio
-
-    clean_session_stores = clean_sessions(sessions_data, file_store)
-
-    # Automatically save all sessions concurrently
-    async def _save_all() -> None:
-        await asyncio.gather(*(store.save(user_id) for store in clean_session_stores))
-
-    asyncio.run(_save_all())
-
-    return clean_session_stores

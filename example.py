@@ -11,11 +11,10 @@ Requirements:
 """
 
 import os
-
+import json
 from dotenv import load_dotenv
 
 from tom_swe.tom_agent import ToMAgent, ToMAgentConfig
-from tom_swe import sleeptime_compute
 
 # Load environment variables
 load_dotenv()
@@ -23,66 +22,24 @@ load_dotenv()
 
 def test_sleeptime():
     """Test the sleeptime_compute function."""
-    import shutil
-    from pathlib import Path
-    from tom_swe.memory.locations import get_cleaned_sessions_dir
 
     print("🔄 Testing sleeptime_compute function")
     print("=" * 40)
 
     # Example session data matching the format you provided
-    example_sessions_data = [
-        {
-            "session_id": "test_session_001",
-            "event_count": 10,
-            "message_count": 4,
-            "conversation_messages": [
-                {
-                    "role": "user",
-                    "content": "I would like to compose a brief email from Graham at All Hands to be sent through resend.com to the OpenHands Email List audience. Please:\n1. Read the resend.com API docs thoroughly\n2. Take a look at the All-Hands-AI/company-website repo for the most recent two blog posts, and summarize both of them into a paragraph-long summary\n3. Read the All-Hands-AI/company-metrics repo's email_tools directory, and prepare a template for this new email.\n4. Send a test email to me graham@all-hands.dev\n\nI will provide you with a resend.com API key.",
-                },
-                {
-                    "role": "assistant",
-                    "content": "I'll help you compose and send that email. Let me break this down into steps and work through each one systematically...",
-                },
-                {"role": "user", "content": "Great, here's the API key: re_abc123"},
-                {
-                    "role": "assistant",
-                    "content": "Thank you for the API key. I'll now proceed with the steps...",
-                },
-            ],
-        }
-    ]
+    # example_sessions_data = [json.load(open("example.json"))]
+    session_data = json.load(open("example.json"))
+    session_data["session_id"] = "test_session_1"
+    example_sessions_data = [session_data]
 
-    # Clean up any existing test data first
-    test_dir = Path(get_cleaned_sessions_dir("", user_id=""))
-    if test_dir.exists():
-        shutil.rmtree(test_dir)
-        print(f"🧹 Cleaned up existing test data: {test_dir}")
+    agent = ToMAgent()
+    agent.sleeptime_compute(example_sessions_data)
 
-    # Process and automatically save the sessions
-    clean_session_stores = sleeptime_compute(example_sessions_data)
-
-    # Print results
-    print(f"✅ Processed and saved {len(clean_session_stores)} sessions")
-    for store in clean_session_stores:
-        session = store.clean_session
-        print(f"\n📋 Session: {session.session_id}")
-        print(f"   Messages: {len(session.messages)}")
-
-        # Show message details
-        important_count = sum(1 for msg in session.messages if msg.is_important)
-        print(f"   Important user messages: {important_count}")
-
-        for i, msg in enumerate(session.messages):
-            status = " (IMPORTANT)" if msg.is_important else ""
-            print(f"   {i+1}. {msg.role}: {msg.content[:50]}...{status}")
-    breakpoint()
-
+    print("✅ Sessions processed and saved successfully!")
     # Clean up test data after showing results
-    if test_dir.exists():
-        shutil.rmtree(test_dir)
-        print(f"\n🧹 Cleaned up test data: {test_dir}")
+    # if test_dir.exists():
+    #     shutil.rmtree(test_dir)
+    #     print(f"\n🧹 Cleaned up test data: {test_dir}")
 
 
 def main():
@@ -98,11 +55,7 @@ def main():
     try:
         # Initialize ToM Agent
         print("\n1. Initializing ToM Agent...")
-        config = ToMAgentConfig(
-            processed_data_dir="./data/processed_data",
-            user_model_dir="./data/user_model",
-            enable_rag=False,
-        )
+        config = ToMAgentConfig()
         agent = ToMAgent(config)
         print("✅ Agent initialized successfully")
 
@@ -140,7 +93,7 @@ def main():
 if __name__ == "__main__":
     # Test the sleeptime function first
     test_sleeptime()
-    print("\n" + "=" * 50 + "\n")
+    # print("\n" + "=" * 50 + "\n")
 
     # Then run the main ToM agent demo
     # main()

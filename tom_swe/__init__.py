@@ -6,12 +6,11 @@ predict their intentions, and anticipate their next actions based on their
 typed messages and interaction patterns using Large Language Models.
 """
 
-from tom_swe.database import (
+from tom_swe.generation.dataclass import (
     InstructionImprovementResponse,
     InstructionRecommendation,
-    OverallUserAnalysis,
-    SessionSummary,
-    UserContext,
+    UserAnalysis,
+    SessionAnalysis,
     UserMessageAnalysis,
     UserProfile,
 )
@@ -29,10 +28,9 @@ from tom_swe.tom_agent import (
     create_tom_agent,
 )
 from tom_swe.tom_module import (
-    UserMentalStateAnalyzer,
+    ToMAnalyzer,
 )
 from tom_swe.memory.conversation_processor import (
-    sleeptime_compute,
     CleanSessionStore,
 )
 
@@ -45,13 +43,12 @@ __all__ = [
     "Document",
     "InstructionImprovementResponse",
     "InstructionRecommendation",
-    "OverallUserAnalysis",
+    "UserAnalysis",
     "RAGAgent",
     "RetrievalResult",
-    "SessionSummary",
+    "SessionAnalysis",
     "ToMAgent",
-    "UserContext",
-    "UserMentalStateAnalyzer",
+    "ToMAnalyzer",
     "UserMessageAnalysis",
     "UserProfile",
     "VectorDB",
@@ -59,6 +56,5 @@ __all__ = [
     "create_tom_agent",
     "load_processed_data",
     "load_user_model_data",
-    "sleeptime_compute",
     "CleanSessionStore",
 ]
