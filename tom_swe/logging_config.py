@@ -7,6 +7,10 @@ as a dependency in OpenHands or other applications.
 
 import logging
 
+# Custom log level for CLI display messages
+CLI_DISPLAY_LEVEL = 25
+logging.addLevelName(CLI_DISPLAY_LEVEL, "CLI_DISPLAY")
+
 
 def configure_tom_swe_logging(parent_logger_name: str = "openhands") -> None:
     """

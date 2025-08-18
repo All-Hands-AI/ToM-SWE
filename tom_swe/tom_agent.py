@@ -62,12 +62,14 @@ load_dotenv()
 
 # Get logger that properly integrates with parent applications like OpenHands
 try:
-    from tom_swe.logging_config import get_tom_swe_logger
+    from tom_swe.logging_config import get_tom_swe_logger, CLI_DISPLAY_LEVEL
 
     logger = get_tom_swe_logger(__name__)
 except ImportError:
     # Fallback for standalone use
     logger = logging.getLogger(__name__)
+    CLI_DISPLAY_LEVEL = 25
+    logging.addLevelName(CLI_DISPLAY_LEVEL, "CLI_DISPLAY")
 
 # Configure litellm
 litellm.set_verbose = False
@@ -351,14 +353,15 @@ class ToMAgent:
                 break
 
             # Type-safe access to structured response
-            logger.info(f"🧠 Agent reasoning: {response.reasoning}")
-            logger.info(f"⚡ Agent action: {response.action.value}")
+            logger.log(CLI_DISPLAY_LEVEL, f"🧠 Agent reasoning: {response.reasoning}")
+            logger.log(CLI_DISPLAY_LEVEL, f"⚡ Agent action: {response.action.value}")
+            # logger.log(CLI_DISPLAY_LEVEL, f"🔍 Action parameters: {response.parameters}")
 
             # Execute the action using ActionExecutor
             result = self.action_executor.execute_action(
                 response.action, response.parameters
             )
-            logger.info(f"🔍 Action result: {result}")
+            # logger.log(CLI_DISPLAY_LEVEL, f"🔍 Action result: {result}")
 
             # Update conversation
             messages.extend(
