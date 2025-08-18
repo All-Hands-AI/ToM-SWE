@@ -94,6 +94,9 @@ class ToMAgentConfig:
     enable_rag: bool = False
     api_key: Optional[str] = None
     api_base: Optional[str] = None
+    skip_memory_collection: bool = (
+        False  # If True, skip workflow and directly predict user mental states
+    )
 
 
 class ToMAgent:
@@ -116,6 +119,7 @@ class ToMAgent:
 
         self.llm_model = config.llm_model or DEFAULT_LLM_MODEL
         self.enable_rag = config.enable_rag
+        self.skip_memory_collection = config.skip_memory_collection
 
         # LLM configuration - use config values if provided, otherwise fallback to env vars
         self.api_key = config.api_key or LITELLM_API_KEY
@@ -337,6 +341,11 @@ class ToMAgent:
 
         for iteration in range(max_iterations):
             logger.info(f"🔄 Workflow iteration {iteration + 1}/{max_iterations}")
+            if self.skip_memory_collection and isinstance(
+                final_response_model, InstructionImprovementResponse
+            ):
+                logger.info("Skipping memory collection for instruction improvement")
+                break
 
             # Use preset actions first, then fall back to LLM
             if preset_actions:
