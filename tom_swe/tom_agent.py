@@ -139,7 +139,7 @@ class ToMAgent:
 
         # Initialize action executor with reference to this agent
         self.action_executor = ActionExecutor(
-            agent_context=self, file_store=self.file_store
+            user_id="", agent_context=self, file_store=self.file_store
         )
 
         rag_status = "enabled" if self.enable_rag else "disabled"
@@ -170,7 +170,6 @@ class ToMAgent:
         assert isinstance(
             user_id, str
         ), f"user_id must be a string, got {type(user_id)}"
-
         # Build comprehensive prompt for instruction improvement
         user_model = load_user_model(user_id, self.file_store)
         prompt = build_better_instruction_prompt(
@@ -375,30 +374,26 @@ class ToMAgent:
             # Check if workflow is complete
             if response.is_complete:
                 logger.info("✅ Workflow completed successfully")
+                break
 
-                # If final_response_model specified, make final structured call
-                if final_response_model:
-                    logger.info(
-                        f"🎯 Making final call with {final_response_model.__name__}"
-                    )
-                    final_result: Any = self.llm_client.call_structured_messages(
-                        messages=messages
-                        + [
-                            {
-                                "role": "assistant",
-                                "content": "Ready to provide final structured result",
-                            }
-                        ],
-                        output_type=final_response_model,
-                        temperature=0.1,
-                    )
-                    return final_result
-                else:
-                    # No final model needed, return action result
-                    return result
-
-        logger.warning(f"⚠️  Workflow reached max iterations ({max_iterations})")
-        return result
+        # If final_response_model specified, make final structured call
+        if final_response_model:
+            logger.info(f"🎯 Making final call with {final_response_model.__name__}")
+            final_result: Any = self.llm_client.call_structured_messages(
+                messages=messages
+                + [
+                    {
+                        "role": "assistant",
+                        "content": "Ready to provide final structured result",
+                    }
+                ],
+                output_type=final_response_model,
+                temperature=0.1,
+            )
+            return final_result
+        else:
+            # No final model needed, return action result
+            return result
 
     def sleeptime_compute(
         self,

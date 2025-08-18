@@ -45,6 +45,7 @@ class ActionExecutor:
 
     def __init__(
         self,
+        user_id: str,
         agent_context: Optional[Any] = None,
         file_store: Optional[FileStore] = None,
     ):
@@ -57,6 +58,7 @@ class ActionExecutor:
         """
         self.agent_context = agent_context
         self.file_store = file_store or LocalFileStore(root="~/.openhands")
+        self.user_id = user_id
 
     def execute_action(self, action: ActionType, parameters: Any) -> str:
         """
@@ -102,13 +104,11 @@ class ActionExecutor:
         """Search within files."""
         try:
             if params.search_scope == "cleaned_sessions":
-                files = self.file_store.list(
-                    get_cleaned_session_filename(params.user_id)
-                )
+                files = self.file_store.list(get_cleaned_session_filename(self.user_id))
             elif params.search_scope == "session_analyses":
-                files = self.file_store.list(get_session_models_dir(params.user_id))
+                files = self.file_store.list(get_session_models_dir(self.user_id))
             elif params.search_scope == "user_profiles":
-                files = [get_overall_user_model_filename(params.user_id)]
+                files = [get_overall_user_model_filename(self.user_id)]
             else:
                 files = []
 
@@ -153,15 +153,16 @@ class ActionExecutor:
 
     def _action_update_json_field(self, params: UpdateJsonFieldParams) -> str:
         """Update a specific JSON field."""
+        field_path = get_overall_user_model_filename(self.user_id)
         try:
             # Read existing data or create new
             try:
-                data = json.loads(self.file_store.read(params.file_path))
+                data = json.loads(self.file_store.read(field_path))
             except Exception:
                 if params.create_if_missing:
                     data = {}
                 else:
-                    return f"File not found: {params.file_path}"
+                    return f"File not found: {field_path}"
 
             # Navigate to field using dot notation
             current = data
@@ -203,9 +204,9 @@ class ActionExecutor:
 
             # Write back
             data["last_updated"] = datetime.now().isoformat()
-            self.file_store.write(params.file_path, json.dumps(data, indent=2))
+            self.file_store.write(field_path, json.dumps(data, indent=2))
 
-            return f"Updated {params.field_path}: {old_value} → {result_value}"
+            return f"Updated {field_path}: {old_value} → {result_value}"
 
         except Exception as e:
             return f"Update error: {str(e)}"

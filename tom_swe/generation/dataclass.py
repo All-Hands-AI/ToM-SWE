@@ -48,9 +48,6 @@ class SearchFileParams(BaseModel):
         default="session_analyses",
         description="Scope of search: 'cleaned_sessions' (raw user interactions), 'session_analyses' (analyzed sessions), 'user_profiles' (overall user models), or 'all'",
     )
-    user_id: str = Field(
-        default="", description="User ID to search within (empty for all users)"
-    )
     max_results: int = Field(
         default=5,
         ge=1,
@@ -66,7 +63,6 @@ class SearchFileParams(BaseModel):
 class UpdateJsonFieldParams(BaseModel):
     """Parameters for UPDATE_JSON_FIELD action."""
 
-    file_path: str = Field(description="Path to the JSON file")
     field_path: str = Field(
         description="Dot notation path to the field (e.g., 'user.preferences.theme')"
     )
