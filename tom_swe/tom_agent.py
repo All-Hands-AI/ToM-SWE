@@ -149,8 +149,8 @@ class ToMAgent:
 
     def propose_instructions(
         self,
-        user_id: str,
-        original_instruction: str,
+        user_id: str | None = "",
+        original_instruction: str = "",
         user_msg_context: str = "",
     ) -> InstructionRecommendation:
         """
@@ -165,6 +165,11 @@ class ToMAgent:
             Instruction recommendation
         """
         logger.info(f"🎯 Proposing instructions for user {user_id}")
+        if user_id is None:
+            user_id = ""
+        assert isinstance(
+            user_id, str
+        ), f"user_id must be a string, got {type(user_id)}"
 
         # Build comprehensive prompt for instruction improvement
         user_model = load_user_model(user_id, self.file_store)
