@@ -162,8 +162,8 @@ class SessionAnalysis(BaseModel):
     user_modeling_summary: str
     intent: str
     per_message_analysis: List[UserMessageAnalysis]
-    session_start: str
-    session_end: str
+    session_start: str = ""
+    session_end: str = ""
     last_updated: str
 
 
@@ -177,7 +177,7 @@ class SessionAnalysisForLLM(BaseModel):
             "code_explanation, optimization, learning, configuration, testing, file_management, general."
         )
     )
-    per_message_analysis: List[UserMessageAnalysis]
+    per_message_analysis: List[UserMessageAnalysis] = Field(default_factory=list)
 
 
 class SessionSummary(BaseModel):

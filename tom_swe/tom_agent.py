@@ -50,8 +50,8 @@ from tom_swe.memory.conversation_processor import clean_sessions
 from tom_swe.memory.local import LocalFileStore
 from tom_swe.memory.locations import (
     get_cleaned_session_filename,
+    get_cleaned_sessions_dir,
     get_overall_user_model_filename,
-    get_session_models_dir,
     get_session_model_filename,
 )
 from tom_swe.memory.store import FileStore, load_user_model
@@ -60,10 +60,14 @@ from tom_swe.utils import build_better_instruction_prompt, format_proposed_instr
 # Load environment variables
 load_dotenv()
 
-# Configure logging - use environment variable for level
-log_level = os.getenv("LOG_LEVEL", "info").upper()
-logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
-logger = logging.getLogger(__name__)
+# Get logger that properly integrates with parent applications like OpenHands
+try:
+    from tom_swe.logging_config import get_tom_swe_logger
+
+    logger = get_tom_swe_logger(__name__)
+except ImportError:
+    # Fallback for standalone use
+    logger = logging.getLogger(__name__)
 
 # Configure litellm
 litellm.set_verbose = False
@@ -350,6 +354,7 @@ class ToMAgent:
             result = self.action_executor.execute_action(
                 response.action, response.parameters
             )
+            logger.info(f"🔍 Action result: {result}")
 
             # Update conversation
             messages.extend(
@@ -393,7 +398,7 @@ class ToMAgent:
     def sleeptime_compute(
         self,
         sessions_data: List[dict[str, Any]],
-        user_id: str = "",
+        user_id: str | None = "",
     ) -> None:
         """
         Process sessions through the three-tier memory system using workflow controller.
@@ -406,12 +411,16 @@ class ToMAgent:
         logger.info(
             f"🔄 Starting sleeptime_compute workflow for {len(sessions_data)} sessions"
         )
-
+        if user_id is None:
+            user_id = ""
+        assert isinstance(
+            user_id, str
+        ), f"user_id must be a string, got {type(user_id)}"
         # Step 1: Pre-process sessions to get cleaned session files
         clean_session_stores = clean_sessions(sessions_data, self.file_store)
 
         # Save all cleaned sessions and collect their file paths
-        async def _save_all() -> List[str]:
+        async def _save_all(user_id: str) -> List[str]:
             await asyncio.gather(
                 *(store.save(user_id) for store in clean_session_stores)
             )
@@ -421,20 +430,26 @@ class ToMAgent:
                 for store in clean_session_stores
             ]
 
-        cleaned_file_paths = asyncio.run(_save_all())
+        # Since this method is called from an async context, we can await directly
+        cleaned_file_paths = asyncio.run(_save_all(user_id))
         logger.info(f"📁 Cleaned sessions saved to: {cleaned_file_paths}")
 
         # Step 2: Find unprocessed sessions (exist in cleaned but not in session models)
-        cleaned_session_ids = [
-            store.clean_session.session_id for store in clean_session_stores
-        ]
+        try:
+            cleaned_session_ids = [
+                file_path.split("/")[-1].replace(".json", "")
+                for file_path in self.file_store.list(get_cleaned_sessions_dir(user_id))
+            ]
+        except FileNotFoundError:
+            # No cleaned sessions directory exists yet
+            cleaned_session_ids = []
         # Find sessions that don't have corresponding model files
         unprocessed_sessions = []
         for session_id in cleaned_session_ids:
             model_file = get_session_model_filename(session_id, user_id)
             if not self.file_store.exists(model_file):
                 unprocessed_sessions.append(session_id)
-
+        logger.info(f"🔍 Unprocessed sessions: {unprocessed_sessions}")
         preset_actions = []
         if unprocessed_sessions:
             # Step 3: Create preset action for batch processing unprocessed sessions
@@ -452,8 +467,7 @@ class ToMAgent:
 
         if (
             not self.file_store.exists(get_overall_user_model_filename(user_id))
-            and self.file_store.exists(get_session_models_dir(user_id))
-            and len(self.file_store.list(get_session_models_dir(user_id))) > 0
+            and unprocessed_sessions
         ):
             preset_actions += [
                 ActionResponse(
@@ -474,7 +488,6 @@ class ToMAgent:
             ]
 
         user_model = load_user_model(user_id, self.file_store)
-
         # Step 4: Use workflow controller with preset actions
         final_result = self._step(
             prompt=f"""
@@ -489,20 +502,18 @@ Complete the three-tier user modeling system by processing these sessions and up
             final_response_model=SleepTimeResponse,
             system_prompt=SLEEP_TIME_COMPUTATION_PROMPT,
             preset_actions=preset_actions,
-            max_iterations=10,
+            max_iterations=3,
         )
         logger.info(f"🔄 Final result: {final_result}")
 
 
 # Convenience function for quick access
 def create_tom_agent(
-    processed_data_dir: str = "./data/processed_data",
-    user_model_dir: str = "./data/user_model",
     llm_model: Optional[str] = None,
     api_key: Optional[str] = None,
     api_base: Optional[str] = None,
     enable_rag: bool = True,
-    **kwargs: Any,
+    file_store: Optional[FileStore] = None,
 ) -> ToMAgent:
     """
     Create and initialize a ToM agent.
@@ -520,11 +531,11 @@ def create_tom_agent(
         Initialized ToMAgent
     """
     config = ToMAgentConfig(
+        file_store=file_store,
         llm_model=llm_model,
         api_key=api_key,
         api_base=api_base,
         enable_rag=enable_rag,
-        **kwargs,
     )
     agent = ToMAgent(config=config)
     return agent

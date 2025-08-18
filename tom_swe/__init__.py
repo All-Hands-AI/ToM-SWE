@@ -6,6 +6,15 @@ predict their intentions, and anticipate their next actions based on their
 typed messages and interaction patterns using Large Language Models.
 """
 
+# Auto-configure logging for integration with parent applications
+try:
+    from tom_swe.logging_config import auto_configure_logging
+
+    auto_configure_logging()
+except ImportError:
+    # Logging configuration not available, continue without it
+    pass
+
 from tom_swe.generation.dataclass import (
     InstructionImprovementResponse,
     InstructionRecommendation,

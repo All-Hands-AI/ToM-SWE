@@ -25,30 +25,21 @@ from tom_swe.api.models import (
 )
 from tom_swe.tom_agent import ToMAgent, create_tom_agent
 
-# Configure logging - use environment variable for level
+# Configure logging only if no handlers exist (avoid duplicate setup)
 log_level = os.getenv("LOG_LEVEL", "info").upper()
-logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
-logger = logging.getLogger(__name__)
+if not logging.root.handlers:
+    logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 
-# Ensure all tom_swe loggers use the same level
-for logger_name in [
-    "tom_swe.generation_utils.generate",
-    "tom_swe.tom_agent",
-    "tom_swe.rag_module",
-]:
-    logging.getLogger(logger_name).setLevel(getattr(logging, log_level, logging.INFO))
+# Get logger that inherits from root
+logger = logging.getLogger(__name__)
 
 
 async def initialize_tom_agent() -> Optional[ToMAgent]:
     """Initialize the ToM agent."""
-    processed_data_dir = os.getenv("TOM_PROCESSED_DATA_DIR", "./data/processed_data")
-    user_model_dir = os.getenv("TOM_USER_MODEL_DIR", "./data/user_model")
     enable_rag = os.getenv("TOM_ENABLE_RAG", "true").lower() in ("true", "1", "yes")
 
     try:
         agent = create_tom_agent(
-            processed_data_dir=processed_data_dir,
-            user_model_dir=user_model_dir,
             enable_rag=enable_rag,
         )
         logger.info("ToM Agent initialized successfully")

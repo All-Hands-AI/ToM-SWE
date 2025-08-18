@@ -107,6 +107,8 @@ def clean_sessions(
                 clean_msg.is_important = _is_important_user_message(
                     content, cleaned_content
                 )
+            else:
+                clean_msg.is_important = False
 
             clean_messages.append(clean_msg)
 
@@ -123,7 +125,10 @@ def clean_sessions(
             file_store=file_store or LocalFileStore(root="~/.openhands"),
             clean_session=clean_session,
         )
-        clean_session_stores.append(store)
+
+        # only keep sessions with at least 2 important messages
+        if sum(msg.is_important for msg in clean_messages) >= 1:
+            clean_session_stores.append(store)
 
     return clean_session_stores
 

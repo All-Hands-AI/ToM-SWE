@@ -100,8 +100,8 @@ Analyze this coding session to understand the user's behavior, intent, and prefe
             user_modeling_summary=result.user_modeling_summary,
             intent=result.intent,
             per_message_analysis=result.per_message_analysis,
-            session_start=session_data.get("start_time", ""),
-            session_end=session_data.get("end_time", ""),
+            session_start=session_data.get("start_time") or "",
+            session_end=session_data.get("end_time") or "",
             last_updated=datetime.now().isoformat(),
         )
 

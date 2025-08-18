@@ -19,7 +19,13 @@ except ImportError:
     json_repair = None  # type: ignore
     JSON_REPAIR_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
+try:
+    from tom_swe.logging_config import get_tom_swe_logger
+
+    logger = get_tom_swe_logger(__name__)
+except ImportError:
+    # Fallback for standalone use
+    logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 

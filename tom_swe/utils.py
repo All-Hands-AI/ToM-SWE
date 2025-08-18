@@ -5,7 +5,13 @@ from typing import Generic, Type, TypeVar, Optional
 import json_repair
 from pydantic import BaseModel
 
-logger = logging.getLogger(__name__)
+try:
+    from tom_swe.logging_config import get_tom_swe_logger
+
+    logger = get_tom_swe_logger(__name__)
+except ImportError:
+    # Fallback for standalone use
+    logger = logging.getLogger(__name__)
 
 OutputType = TypeVar("OutputType", bound=object)
 T = TypeVar("T", bound=BaseModel)

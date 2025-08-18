@@ -31,7 +31,13 @@ from tom_swe.memory.locations import (
 from tom_swe.memory.store import FileStore
 from tom_swe.memory.local import LocalFileStore
 
-logger = logging.getLogger(__name__)
+try:
+    from tom_swe.logging_config import get_tom_swe_logger
+
+    logger = get_tom_swe_logger(__name__)
+except ImportError:
+    # Fallback for standalone use
+    logger = logging.getLogger(__name__)
 
 
 class ActionExecutor:

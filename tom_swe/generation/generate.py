@@ -5,7 +5,6 @@ and provides both async and sync methods for structured LLM calls.
 """
 
 import logging
-import os
 from dataclasses import dataclass
 from typing import Optional, Type, TypeVar, List, Dict
 
@@ -14,11 +13,13 @@ from pydantic import BaseModel
 
 from .output_parsers import PydanticOutputParser
 
-logger = logging.getLogger(__name__)
+try:
+    from tom_swe.logging_config import get_tom_swe_logger
 
-# Set logger level based on environment variable
-log_level = os.getenv("LOG_LEVEL", "info").upper()
-logger.setLevel(getattr(logging, log_level, logging.INFO))
+    logger = get_tom_swe_logger(__name__)
+except ImportError:
+    # Fallback for standalone use
+    logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -65,6 +66,7 @@ class LLMClient:
         self,
         ill_formed_output: str,
         format_instructions: str,
+        output_type: Type[T],
     ) -> str:
         """
         Reformat ill-formed output to valid JSON using a fallback model.
@@ -93,7 +95,7 @@ class LLMClient:
 
         completion_args = {
             "model": self.config.fallback_model,
-            "response_format": {"type": "json_object"},
+            "response_format": output_type,
             "messages": [{"role": "user", "content": content}],
         }
 
@@ -142,6 +144,7 @@ class LLMClient:
             "messages": [{"role": "user", "content": full_prompt}],
             "temperature": temperature or self.config.temperature,
             "max_tokens": max_tokens or self.config.max_tokens,
+            "response_format": output_type,
         }
 
         # Add optional parameters
@@ -173,6 +176,7 @@ class LLMClient:
                 reformatted_output = await self.format_bad_output(
                     ill_formed_output=content,
                     format_instructions=format_instructions,
+                    output_type=output_type,
                 )
 
                 # Try to parse the reformatted output
@@ -220,6 +224,7 @@ class LLMClient:
             "messages": full_messages,
             "temperature": temperature or self.config.temperature,
             "max_tokens": max_tokens or self.config.max_tokens,
+            "response_format": output_type,
         }
 
         # Add optional parameters
@@ -265,7 +270,7 @@ class LLMClient:
 
                 fallback_completion_args = {
                     "model": self.config.fallback_model,
-                    "response_format": {"type": "json_object"},
+                    "response_format": output_type,
                     "messages": [{"role": "user", "content": fallback_content}],
                 }
 

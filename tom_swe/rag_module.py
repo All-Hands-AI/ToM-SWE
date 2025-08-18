@@ -39,10 +39,14 @@ load_dotenv()
 # Configure litellm for better error handling
 litellm.set_verbose = False
 
-# Configure logging - use environment variable for level
-log_level = os.getenv("LOG_LEVEL", "info").upper()
-logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
-logger = logging.getLogger(__name__)
+# Get logger that properly integrates with parent applications like OpenHands
+try:
+    from tom_swe.logging_config import get_tom_swe_logger
+
+    logger = get_tom_swe_logger(__name__)
+except ImportError:
+    # Fallback for standalone use
+    logger = logging.getLogger(__name__)
 
 # LiteLLM configuration
 DEFAULT_LLM_MODEL = os.getenv(

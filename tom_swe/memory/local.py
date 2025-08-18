@@ -1,11 +1,17 @@
 import logging
+import os
+import shutil
 from typing import TypeVar
 
 from .store import FileStore
-import os
-import shutil
 
-logger = logging.getLogger(__name__)
+try:
+    from tom_swe.logging_config import get_tom_swe_logger
+
+    logger = get_tom_swe_logger(__name__)
+except ImportError:
+    # Fallback for standalone use
+    logger = logging.getLogger(__name__)
 
 # Base directory for user model files
 USER_MODEL_BASE_DIR = "data/user_model/user_model_overall"
@@ -41,6 +47,8 @@ class LocalFileStore(FileStore):
 
     def list(self, path: str) -> list[str]:
         full_path = self.get_full_path(path)
+        if not self.exists(path):
+            os.makedirs(full_path, exist_ok=True)
         files = [os.path.join(path, f) for f in os.listdir(full_path)]
         files = [f + "/" if os.path.isdir(self.get_full_path(f)) else f for f in files]
         return files
