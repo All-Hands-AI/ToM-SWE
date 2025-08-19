@@ -341,8 +341,10 @@ class ToMAgent:
 
         for iteration in range(max_iterations):
             logger.info(f"🔄 Workflow iteration {iteration + 1}/{max_iterations}")
-            if self.skip_memory_collection and isinstance(
-                final_response_model, InstructionImprovementResponse
+            if (
+                self.skip_memory_collection
+                and final_response_model
+                and final_response_model.__name__ == "InstructionImprovementResponse"
             ):
                 logger.info("Skipping memory collection for instruction improvement")
                 break
@@ -526,6 +528,7 @@ def create_tom_agent(
     api_base: Optional[str] = None,
     enable_rag: bool = True,
     file_store: Optional[FileStore] = None,
+    skip_memory_collection: bool = False,
 ) -> ToMAgent:
     """
     Create and initialize a ToM agent.
@@ -548,6 +551,7 @@ def create_tom_agent(
         api_key=api_key,
         api_base=api_base,
         enable_rag=enable_rag,
+        skip_memory_collection=skip_memory_collection,
     )
     agent = ToMAgent(config=config)
     return agent
