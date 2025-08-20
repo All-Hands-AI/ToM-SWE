@@ -179,7 +179,6 @@ class ToMAgent:
 
         # Update the action executor's user_id
         self.action_executor.user_id = user_id
-
         # Build comprehensive prompt for instruction improvement
         user_model = load_user_model(user_id, self.file_store)
 
@@ -219,7 +218,6 @@ class ToMAgent:
         else:
             # Handle simple string content
             original_instruction = str(last_content)
-
         try:
             clarity_result = self.llm_client.call_structured_messages(
                 messages=propose_instructions_messages,
