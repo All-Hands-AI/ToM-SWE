@@ -176,6 +176,10 @@ class ToMAgent:
         assert isinstance(
             user_id, str
         ), f"user_id must be a string, got {type(user_id)}"
+
+        # Update the action executor's user_id
+        self.action_executor.user_id = user_id
+
         # Build comprehensive prompt for instruction improvement
         user_model = load_user_model(user_id, self.file_store)
         prompt = build_better_instruction_prompt(

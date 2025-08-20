@@ -43,3 +43,12 @@ def get_overall_user_model_filename(user_id: str | None = None) -> str:
         return f"{base}/users/{user_id}/overall_user_model.json"
     else:
         return f"{base}/overall_user_model.json"
+
+
+def get_usermodeling_dir(user_id: str | None = None) -> str:
+    """Get the directory for the overall user model."""
+    base = str(Path(USER_MODEL_BASE_DIR).expanduser())
+    if user_id:
+        return f"{base}/users/{user_id}"
+    else:
+        return f"{base}"
