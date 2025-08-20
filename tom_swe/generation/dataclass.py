@@ -225,6 +225,17 @@ class InstructionImprovementResponse(BaseModel):
     )
 
 
+class ClarityAssessment(BaseModel):
+    """Simple model for assessing instruction clarity."""
+
+    reasoning: str = Field(
+        description="Brief reasoning for why the instruction is clear or unclear"
+    )
+    is_clear: bool = Field(
+        description="True if the instruction is clear enough to proceed without additional context, False if it needs clarification"
+    )
+
+
 class InstructionRecommendation(BaseModel):
     """Pydantic model for an instruction recommendation."""
 

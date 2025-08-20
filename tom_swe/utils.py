@@ -112,30 +112,6 @@ def debug_large_prompt(
         logger.info("  - Full prompt saved to /tmp/large_prompt_debug.txt")
 
 
-def build_better_instruction_prompt(
-    original_instruction: str,
-    user_msg_context: str,
-    user_model: str,
-) -> str:
-    """Build the prompt for instruction improvement."""
-    return f"""
-Based on the following information, provide suggestions to help the agent better understand and help the user.
-
-## Original Current User Instruction:
-{original_instruction}
-
-## Context
-### User Context:
-Here is the content of the user model (`overall_user_model.json`):
-{user_model}
-
-### Current context (interactions happening before the original instruction, if any):
-```
-{user_msg_context}
-```
-"""
-
-
 def format_proposed_instruction(
     original_instruction: str,
     improved_instruction: str,

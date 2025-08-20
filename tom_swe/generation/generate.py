@@ -6,7 +6,7 @@ and provides both async and sync methods for structured LLM calls.
 
 import logging
 from dataclasses import dataclass
-from typing import Optional, Type, TypeVar, List, Dict
+from typing import Optional, Type, TypeVar, List, Dict, Any
 
 from litellm import acompletion, completion
 from pydantic import BaseModel
@@ -192,7 +192,7 @@ class LLMClient:
 
     def call_structured_messages(
         self,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, Any]],
         output_type: Type[T],
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
@@ -201,7 +201,7 @@ class LLMClient:
         Call LLM with structured output (sync).
 
         Args:
-            prompt: The main prompt for the LLM
+            messages: List of message dicts (supports cache_control if present)
             output_type: Pydantic model class for the expected output
             temperature: Override default temperature for this call
             max_tokens: Override default max_tokens for this call

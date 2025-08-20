@@ -68,11 +68,27 @@ def main():
         print(f"   User: {user_id}")
         print(f"   Context: {context}")
 
-        # Get improved instructions
+        # Create formatted messages with caching support
+        formatted_messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant.",
+                "cache_control": {"type": "ephemeral"},  # Cache system message
+            },
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": context}],  # Context message
+            },
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": instruction}],  # Main instruction
+            },
+        ]
+
+        # Get improved instructions using new API
         recommendation = agent.propose_instructions(
             user_id=user_id,
-            original_instruction=instruction,
-            user_msg_context=context,
+            formatted_messages=formatted_messages,
         )
 
         # Show results
@@ -92,8 +108,8 @@ def main():
 
 if __name__ == "__main__":
     # Test the sleeptime function first
-    test_sleeptime()
+    # test_sleeptime()
     # print("\n" + "=" * 50 + "\n")
 
     # Then run the main ToM agent demo
-    # main()
+    main()

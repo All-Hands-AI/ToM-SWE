@@ -17,10 +17,11 @@ Key Features:
 
 import logging
 import os
+import json
 import time
 import asyncio
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 
 # Third-party imports
 import litellm
@@ -30,6 +31,7 @@ from dotenv import load_dotenv
 from tom_swe.generation.dataclass import (
     InstructionImprovementResponse,
     InstructionRecommendation,
+    ClarityAssessment,
     AnalyzeSessionParams,
     InitializeUserProfileParams,
     CompleteTaskParams,
@@ -55,7 +57,7 @@ from tom_swe.memory.locations import (
     get_session_model_filename,
 )
 from tom_swe.memory.store import FileStore, load_user_model
-from tom_swe.utils import build_better_instruction_prompt, format_proposed_instruction
+from tom_swe.utils import format_proposed_instruction
 
 # Load environment variables
 load_dotenv()
@@ -156,16 +158,14 @@ class ToMAgent:
     def propose_instructions(
         self,
         user_id: str | None = "",
-        original_instruction: str = "",
-        user_msg_context: str = "",
-    ) -> InstructionRecommendation:
+        formatted_messages: List[Dict[str, Any]] | None = None,
+    ) -> InstructionRecommendation | None:
         """
         Propose improved instructions using workflow controller.
 
         Args:
             user_id: The user ID to analyze and generate instructions for
-            original_instruction: The original instruction to improve
-            user_msg_context: Optional user message context
+            formatted_messages: List of formatted message dicts with cache support
 
         Returns:
             Instruction recommendation
@@ -182,27 +182,76 @@ class ToMAgent:
 
         # Build comprehensive prompt for instruction improvement
         user_model = load_user_model(user_id, self.file_store)
-        prompt = build_better_instruction_prompt(
-            original_instruction, user_msg_context, user_model
-        )
 
-        # Use workflow controller with final structured output
-        result = self._step(
-            prompt=prompt,
-            final_response_model=InstructionImprovementResponse,  # Final structured output
-            system_prompt=PROPOSE_INSTRUCTIONS_PROMPT,
+        # Ensure formatted_messages is not None
+        if formatted_messages is None:
+            formatted_messages = []
+        # Early stop: Quick clarity assessment for caching optimization
+        logger.info("🔍 Performing early clarity assessment")
+        propose_instructions_messages: List[Dict[str, Any]] = (
+            [
+                {
+                    "role": "system",
+                    "content": PROPOSE_INSTRUCTIONS_PROMPT,
+                    "cache_control": {"type": "ephemeral"},  # Cache the system prompt
+                }
+            ]
+            + [
+                {
+                    "role": "user",
+                    "content": f"Here is the content of the user model (`overall_user_model.json`): {user_model}",
+                }
+            ]
+            + formatted_messages
         )
+        assert (
+            propose_instructions_messages[-1]["role"] == "user"
+        ), "Last message must be a user message"
 
-        logger.info(f"🔍 PROPOSE_INSTRUCTIONS RESULT: {result}")
-        if not result:
-            # Return empty recommendation for failed calls
-            return InstructionRecommendation(
-                original_instruction=original_instruction,
-                improved_instruction=original_instruction,
-                reasoning="Failed to generate improvement",
-                confidence_score=0.0,
-                clarity_score=0.0,
+        # Extract original instruction text from the last user message
+        last_content = propose_instructions_messages[-1]["content"]
+        if isinstance(last_content, list):
+            # Handle structured content (text/image)
+            text_parts = [
+                c.get("text", "") for c in last_content if c.get("type") == "text"
+            ]
+            original_instruction = " ".join(text_parts)
+        else:
+            # Handle simple string content
+            original_instruction = str(last_content)
+
+        try:
+            clarity_result = self.llm_client.call_structured_messages(
+                messages=propose_instructions_messages,
+                output_type=ClarityAssessment,
+                temperature=0.1,
             )
+
+            # Early stop if clarity is sufficient
+            if clarity_result and clarity_result.is_clear:
+                logger.info(
+                    f"✅ Early stop: Intent is clear - {clarity_result.reasoning}"
+                )
+                # Return minimal improvement for clear instructions
+                return None
+            else:
+                logger.info(
+                    f"🔄 Proceeding with full workflow - {clarity_result.reasoning if clarity_result else 'unknown'}"
+                )
+                # Use workflow controller with final structured output
+                propose_instructions_messages.append(
+                    {
+                        "role": "assistant",
+                        "content": f"Clarity assessment: {clarity_result.reasoning} (The instruction is clear: {clarity_result.is_clear})",
+                    }
+                )
+                result = self._step(
+                    messages=propose_instructions_messages,
+                    final_response_model=InstructionImprovementResponse,
+                )
+        except Exception as e:
+            logger.warning(f"Clarity assessment failed: {e}, exit")
+            return None
 
         # Post-process the instruction with formatted output
         final_instruction = format_proposed_instruction(
@@ -310,10 +359,9 @@ class ToMAgent:
 
     def _step(
         self,
-        prompt: str,
+        messages: List[Dict[str, Any]],
         response_model: type = ActionResponse,
         final_response_model: Optional[type] = None,
-        system_prompt: Optional[str] = None,
         max_iterations: int = 3,
         preset_actions: Optional[List[Any]] = None,
     ) -> Any:
@@ -331,14 +379,6 @@ class ToMAgent:
         Returns:
             Final result - either from final_response_model or last action result
         """
-        if not system_prompt:
-            # Auto-generate system prompt based on available actions
-            system_prompt = "You are a helpful assistant."
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ]
 
         logger.info(f"🤖 Starting workflow with {max_iterations} max iterations")
         logger.debug(f"Initial messages: {messages}")
@@ -458,11 +498,26 @@ class ToMAgent:
                 file_path.split("/")[-1].replace(".json", "")
                 for file_path in self.file_store.list(get_cleaned_sessions_dir(user_id))
             ]
+            # remove empty strings
+            cleaned_session_ids = [x for x in cleaned_session_ids if x]
+
+            # rank the cleaned_session_ids; the last id is the most recent session
+            def get_last_updated(session_id: str) -> str:
+                session_data = json.loads(
+                    self.file_store.read(
+                        get_cleaned_session_filename(session_id, user_id)
+                    )
+                )
+                return str(session_data.get("last_updated", ""))
+
+            cleaned_session_ids = sorted(cleaned_session_ids, key=get_last_updated)
         except FileNotFoundError:
             # No cleaned sessions directory exists yet
             cleaned_session_ids = []
         # Find sessions that don't have corresponding model files
-        unprocessed_sessions = []
+        unprocessed_sessions = [
+            cleaned_session_ids[-1]
+        ]  # always process the most recent session as we don't know whether such session is updated.
         for session_id in cleaned_session_ids:
             model_file = get_session_model_filename(session_id, user_id)
             if not self.file_store.exists(model_file):
@@ -507,18 +562,16 @@ class ToMAgent:
 
         user_model = load_user_model(user_id, self.file_store)
         # Step 4: Use workflow controller with preset actions
+        messages = [
+            {"role": "system", "content": SLEEP_TIME_COMPUTATION_PROMPT},
+            {
+                "role": "user",
+                "content": f"Here is the content of the user model (`overall_user_model.json`): {user_model}\nI have {len(unprocessed_sessions)} unprocessed session files that need batch processing:\nSession IDs to process: {unprocessed_sessions}.",
+            },
+        ]
         final_result = self._step(
-            prompt=f"""
-Here is the content of the user model (`overall_user_model.json`):
-{user_model}
-I have {len(unprocessed_sessions)} unprocessed session files that need batch processing:
-
-Session IDs to process: {unprocessed_sessions}
-
-Complete the three-tier user modeling system by processing these sessions and updating the overall user profile.
-            """.strip(),
+            messages=messages,
             final_response_model=SleepTimeResponse,
-            system_prompt=SLEEP_TIME_COMPUTATION_PROMPT,
             preset_actions=preset_actions,
             max_iterations=3,
         )
