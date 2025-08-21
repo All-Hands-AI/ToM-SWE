@@ -16,8 +16,8 @@ except ImportError:
     pass
 
 from tom_swe.generation.dataclass import (
-    InstructionImprovementResponse,
-    InstructionRecommendation,
+    InstructionImprovementLLM,
+    InstructionImprovement,
     UserAnalysis,
     SessionAnalysis,
     UserMessageAnalysis,
@@ -50,8 +50,8 @@ __description__ = "LLM-powered Theory of Mind analysis for user behavior predict
 __all__ = [
     "ChunkingConfig",
     "Document",
-    "InstructionImprovementResponse",
-    "InstructionRecommendation",
+    "InstructionImprovementLLM",
+    "InstructionImprovement",
     "UserAnalysis",
     "RAGAgent",
     "RetrievalResult",

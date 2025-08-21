@@ -14,6 +14,7 @@ from tom_swe.generation.dataclass import (
     UserAnalysisForLLM,
 )
 from .utils import PydanticOutputParser
+from tom_swe.prompts import PROMPTS
 
 
 class ToMAnalyzer:
@@ -74,22 +75,14 @@ class ToMAnalyzer:
             pydantic_object=SessionAnalysisForLLM
         )
 
-        prompt = f"""
-Analyze this coding session to understand the user's behavior, intent, and preferences.
-
-## Full Session Context:
-{full_session_context}
-
-## Key User Messages (focus on these for analysis):
-{key_user_messages}
-
-## Session Metadata:
-- Session ID: {session_id}
-- Total messages: {len(session_data['messages'])}
-- Important user messages: {len(important_user_messages)}
-
-{parser.get_format_instructions()}
-"""
+        prompt = PROMPTS["session_analysis"].format(
+            full_session_context=full_session_context,
+            key_user_messages=key_user_messages,
+            session_id=session_id,
+            total_messages=len(session_data["messages"]),
+            important_user_messages=len(important_user_messages),
+            format_instructions=parser.get_format_instructions(),
+        )
         result = await self.llm_client.call_structured_async(
             prompt=prompt,
             output_type=SessionAnalysisForLLM,
@@ -122,19 +115,12 @@ Analyze this coding session to understand the user's behavior, intent, and prefe
             pydantic_object=UserAnalysisForLLM
         )
 
-        prompt = f"""
-Analyze these recent coding sessions to create a comprehensive user profile.
-
-User ID: {self.user_id}
-Recent Sessions ({len(recent_sessions)} sessions):
-{sessions_text}
-
-Create a user analysis including:
-1. User profile with overall description, intent/emotion distributions, preferences
-2. Keep the session summaries as provided
-
-{parser.get_format_instructions()}
-"""
+        prompt = PROMPTS["user_analysis"].format(
+            user_id=self.user_id,
+            num_sessions=len(recent_sessions),
+            sessions_text=sessions_text,
+            format_instructions=parser.get_format_instructions(),
+        )
 
         result = await self.llm_client.call_structured_async(
             prompt=prompt,

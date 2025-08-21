@@ -29,16 +29,13 @@ from dotenv import load_dotenv
 
 # Local imports
 from tom_swe.generation.dataclass import (
-    InstructionImprovementResponse,
-    InstructionRecommendation,
+    InstructionImprovementLLM,
+    InstructionImprovement,
     ClarityAssessment,
     AnalyzeSessionParams,
     InitializeUserProfileParams,
-    CompleteTaskParams,
 )
 from tom_swe.generation import (
-    SLEEP_TIME_COMPUTATION_PROMPT,
-    PROPOSE_INSTRUCTIONS_PROMPT,
     LLMConfig,
     LLMClient,
     ActionType,
@@ -46,6 +43,7 @@ from tom_swe.generation import (
     SleepTimeResponse,
     ActionExecutor,
 )
+from tom_swe.prompts import PROMPTS
 from tom_swe.rag_module import RAGAgent, create_rag_agent
 from tom_swe.tom_module import ToMAnalyzer
 from tom_swe.memory.conversation_processor import clean_sessions
@@ -159,7 +157,7 @@ class ToMAgent:
         self,
         user_id: str | None = "",
         formatted_messages: List[Dict[str, Any]] | None = None,
-    ) -> InstructionRecommendation | None:
+    ) -> InstructionImprovement | None:
         """
         Propose improved instructions using workflow controller.
 
@@ -191,7 +189,7 @@ class ToMAgent:
             [
                 {
                     "role": "system",
-                    "content": PROPOSE_INSTRUCTIONS_PROMPT,
+                    "content": PROMPTS["propose_instructions"],
                     "cache_control": {"type": "ephemeral"},  # Cache the system prompt
                 }
             ]
@@ -245,7 +243,7 @@ class ToMAgent:
                 )
                 result = self._step(
                     messages=propose_instructions_messages,
-                    final_response_model=InstructionImprovementResponse,
+                    final_response_model=InstructionImprovementLLM,
                 )
         except Exception as e:
             logger.warning(f"Clarity assessment failed: {e}, exit")
@@ -260,7 +258,7 @@ class ToMAgent:
             clarity_score=result.clarity_score,
         )
 
-        return InstructionRecommendation(
+        return InstructionImprovement(
             original_instruction=original_instruction,
             improved_instruction=final_instruction,
             reasoning=result.reasoning,
@@ -547,21 +545,14 @@ class ToMAgent:
                         user_id=user_id,
                     ),
                     reasoning="Pre-configured saving of updated user profile",
-                    is_complete=False,
-                ),
-                ActionResponse(
-                    action=ActionType.COMPLETE_TASK,
-                    parameters=CompleteTaskParams(
-                        result="User profile initialized",
-                    ),
-                    reasoning="Pre-configured saving of updated user profile",
+                    is_complete=True,
                 ),
             ]
 
         user_model = load_user_model(user_id, self.file_store)
         # Step 4: Use workflow controller with preset actions
         messages = [
-            {"role": "system", "content": SLEEP_TIME_COMPUTATION_PROMPT},
+            {"role": "system", "content": PROMPTS["sleeptime_compute"]},
             {
                 "role": "user",
                 "content": f"Here is the content of the user model (`overall_user_model.json`): {user_model}\nI have {len(unprocessed_sessions)} unprocessed session files that need batch processing:\nSession IDs to process: {unprocessed_sessions}.",

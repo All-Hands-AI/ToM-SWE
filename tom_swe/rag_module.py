@@ -26,6 +26,7 @@ import numpy as np
 from dotenv import load_dotenv
 from litellm import completion, embedding
 from tqdm import tqdm
+from tom_swe.prompts import PROMPTS
 
 # Token counting
 try:
@@ -729,13 +730,9 @@ class VectorDB:
             Condensed content or None if condensation fails
         """
         try:
-            prompt = f"""Please condense the following message to max {max_tokens} tokens (do not exceed the limit, and do not add any extra information).
-FOCUS: Keep the most important information that provides context for understanding a conversation.
-
-Original message:
-{content}
-
-Condensed version:"""
+            prompt = PROMPTS["message_condensation"].format(
+                max_tokens=max_tokens, content=content
+            )
 
             # Use efficient model for condensation
             response = completion(

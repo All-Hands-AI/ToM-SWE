@@ -28,7 +28,6 @@ class ActionType(Enum):
 
     # RAG Operations
     RAG_SEARCH = "rag_search"
-    COMPLETE_TASK = "complete_task"
 
 
 # Type-safe parameter models for each action
@@ -73,7 +72,7 @@ class UpdateJsonFieldParams(BaseModel):
     new_value: Any = Field(description="New value to set for the field")
     list_operation: str = Field(
         default="append",
-        description="List operation: 'append' (add new_value to end of list, avoid duplicates), 'remove' (remove new_value from list OR remove by index if new_value is integer)",
+        description="List operation: 'append' or 'remove' (by value or index)",
     )
     create_if_missing: bool = Field(
         default=False, description="Create parent fields/file if they don't exist"
@@ -99,16 +98,17 @@ class RagSearchParams(BaseModel):
 
     query: str = Field(description="Query for RAG search")
     k: int = Field(
-        default=5, ge=1, le=20, description="Number of top results to return"
+        default=5,
+        ge=1,
+        le=20,
+        description="Number of top results to return",
     )
 
 
 class CompleteTaskParams(BaseModel):
     """Parameters for COMPLETE_TASK action."""
 
-    result: str = Field(
-        default="Task completed", description="Result message for task completion"
-    )
+    result: str = Field(description="Result message for the completed task")
 
 
 # Union type for all action parameters
@@ -119,7 +119,6 @@ ActionParams = Union[
     AnalyzeSessionParams,
     InitializeUserProfileParams,
     RagSearchParams,
-    CompleteTaskParams,
 ]
 
 
@@ -169,7 +168,7 @@ class SessionAnalysis(BaseModel):
 
 class SessionAnalysisForLLM(BaseModel):
     user_modeling_summary: str = Field(
-        description="A description of the user's modeling. Basically tries to describe what does the user want to achieve in this session and how users behavior reflects their certain characteristics."
+        description="User modeling summary describing session goals and behavioral characteristics"
     )
     intent: str = Field(
         description=(
@@ -208,7 +207,7 @@ class UserAnalysis(BaseModel):
     last_updated: str
 
 
-class InstructionImprovementResponse(BaseModel):
+class InstructionImprovementLLM(BaseModel):
     """Pydantic model for LLM response to instruction improvement requests."""
 
     reasoning: str = Field(
@@ -217,15 +216,15 @@ class InstructionImprovementResponse(BaseModel):
     clarity_score: float = Field(
         ge=0.0,
         le=1.0,
-        description="Clarity score (0-1) indicating how clear the original user instruction is (the swe agent is considering the instruction as unclear, but you should give your own judgement combining with the past interactions with the specific user, which the swe agent has no access to), 0 means the original user instruction could be ambiguous or missing important details.",
+        description="Clarity score (0-1) indicating how clear the original user instruction is",
     )
     improved_instruction: str = Field(
-        description="Suggestions to the swe agent on how to better understand and help the user (e.g., 'you could respond the user with: `Based on your previous projects on ..., you might want to ...`'). If the user's instruction is unclear (low clarity score), should suggest the swe agent to ask for clarification (Be very strong about asking the agent to not do anything concretely without figuring out the user's intent first, e.g., 'IMPORTANT: Don't DO anything concretely, FIRST ask for clarification!!'). Also suggest some emojis to make the conversation with the user more engaging if users would prefer that based on your understanding of the user (e.g., 'you could use 🤔 to show that you are thinking about the user's request, or 🤯 to show that you are surprised by the user's request, or 🤗 to show that you are happy to help the user, etc.). Lastly, give swe agent suggestions on how to be mindful about the user's preferences and mental state (e.g., Avoid asking too many questions all at once, making the questions easier to answer for the user, making the output easier to understand for the user, etc.)."
+        description="Personalized suggestions for the SWE agent on how to better understand and help the user"
     )
     confidence_score: float = Field(
         ge=0.0,
         le=1.0,
-        description="Confidence score (0-1) for how confident you are about your suggestions to the swe agent. 0 means not confident at all, 1 means very confident.",
+        description="Confidence score (0-1) for the suggestion quality",
     )
 
 
@@ -240,14 +239,14 @@ class ClarityAssessment(BaseModel):
     )
 
 
-class InstructionRecommendation(BaseModel):
+class InstructionImprovement(BaseModel):
     """Pydantic model for an instruction recommendation."""
 
     original_instruction: str = Field(
         description="The original instruction that was improved"
     )
     improved_instruction: str = Field(
-        description="The improved instruction personalized to the user, think hard about what users really want to achieve and output markdown bullet points format with question marks in the points that you are not sure about. (style: blue text, italic)"
+        description="The improved instruction personalized to the user in markdown format"
     )
     reasoning: str = Field(description="Reasoning for the improvements made")
     confidence_score: float = Field(

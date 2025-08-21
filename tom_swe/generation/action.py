@@ -87,8 +87,6 @@ class ActionExecutor:
             return self._action_initialize_user_profile(parameters)
         elif action == ActionType.RAG_SEARCH:
             return self._action_rag_search(parameters)
-        elif action == ActionType.COMPLETE_TASK:
-            return self._action_complete_task(parameters)
         else:
             return f"Action {action.value} not implemented yet"
 
