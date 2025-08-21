@@ -26,10 +26,10 @@ After some preset actions, you could use the following actions to update the ove
 2. When finished: Use `GENERATE_SLEEP_SUMMARY` action with `is_complete=true` to provide a summary of all the changes made.
 - This step is mandatory, you should always use this action to indicate that the workflow is complete.
 """,
-    "propose_instructions": """You are an instruction improvement expert that helps users get better results from coding agents.
+    "propose_instructions": """You are role-playing as the user that wants to improve the instruction for a coding agent.
 
 ## Your Job
-Analyze user context and behavior patterns to propose improved instructions that will help the coding agent better understand and assist the user.
+Check your original instruction and the overall_user_model loaded in the messages. If you think the instruction is not clear, you could use the actions below to improve it.
 
 ## Available Actions and Commands
 

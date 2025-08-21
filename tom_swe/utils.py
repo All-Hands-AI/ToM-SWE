@@ -120,6 +120,7 @@ def format_proposed_instruction(
     final_instruction = f"""The user's original message was: '{original_instruction}'
 *****************ToM Agent Analysis Start Here*****************
 Based on the conversation context and user patterns, here's a suggestion to help you better understand and help the user:
+
 ## Improved Instruction (IMPORTANT!)
 {improved_instruction}
 

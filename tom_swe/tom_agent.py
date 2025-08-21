@@ -203,17 +203,36 @@ class ToMAgent:
             propose_instructions_messages[-1]["role"] == "user"
         ), "Last message must be a user message"
 
-        # Extract original instruction text from the last user message
-        last_content = propose_instructions_messages[-1]["content"]
-        if isinstance(last_content, list):
-            # Handle structured content (text/image)
-            text_parts = [
-                c.get("text", "") for c in last_content if c.get("type") == "text"
-            ]
-            original_instruction = " ".join(text_parts)
-        else:
-            # Handle simple string content
-            original_instruction = str(last_content)
+        # Extract original instruction text from all consecutive user messages from the end
+        def extract_text_from_content(content: str | list[dict[str, Any]]) -> str:
+            """Extract text from message content (handles both string and structured content)."""
+            if isinstance(content, list):
+                # Handle structured content (text/image)
+                text_parts = [
+                    c.get("text", "") for c in content if c.get("type") == "text"
+                ]
+                return " ".join(text_parts)
+            else:
+                # Handle simple string content
+                return str(content)
+
+        # Collect all consecutive user messages from the end
+        propose_instructions_messages.append(
+            {
+                "role": "user",
+                "content": f"Here is the my original instruction: {formatted_messages[-1]['content']}\n Now I want you to role-play as me and improve the instruction.",
+            }
+        )
+        user_messages: list[str] = []
+        for i in range(len(propose_instructions_messages) - 1, -1, -1):
+            message = propose_instructions_messages[i]
+            if message["role"] == "user":
+                text = extract_text_from_content(message["content"])
+                user_messages.insert(0, text)  # Insert at beginning to maintain order
+            else:
+                break  # Stop when we hit a non-user message
+
+        original_instruction = " ".join(user_messages)
         try:
             clarity_result = self.llm_client.call_structured_messages(
                 messages=propose_instructions_messages,
