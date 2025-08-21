@@ -48,8 +48,12 @@ class SearchFileParams(BaseModel):
         default="session_analyses",
         description="Scope of search: 'cleaned_sessions' (raw user interactions), 'session_analyses' (analyzed sessions), 'user_profiles' (overall user models), or 'all'",
     )
+    search_method: str = Field(
+        default="bm25",
+        description="Search method: 'bm25' (semantic ranking) or 'string_match' (exact substring)",
+    )
     max_results: int = Field(
-        default=5,
+        default=2,
         ge=1,
         le=20,
         description="Maximum number of matching files/sessions to return",

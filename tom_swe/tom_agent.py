@@ -408,13 +408,13 @@ class ToMAgent:
             # Type-safe access to structured response
             logger.log(CLI_DISPLAY_LEVEL, f"🧠 Agent reasoning: {response.reasoning}")
             logger.log(CLI_DISPLAY_LEVEL, f"⚡ Agent action: {response.action.value}")
-            # logger.log(CLI_DISPLAY_LEVEL, f"🔍 Action parameters: {response.parameters}")
+            logger.log(CLI_DISPLAY_LEVEL, f"🔍 Action parameters: {response.parameters}")
 
             # Execute the action using ActionExecutor
             result = self.action_executor.execute_action(
                 response.action, response.parameters
             )
-            # logger.log(CLI_DISPLAY_LEVEL, f"🔍 Action result: {result}")
+            logger.log(CLI_DISPLAY_LEVEL, f"🔍 Action result: {result}")
 
             # Update conversation
             messages.extend(

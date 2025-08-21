@@ -8,9 +8,10 @@ that the agent can use to interact with files, process sessions, and manage user
 import asyncio
 import json
 import logging
-from typing import Any, Optional
+from typing import Any, Optional, List
 from datetime import datetime
-
+import bm25s
+import Stemmer
 from tom_swe.generation.dataclass import (
     ActionType,
     ReadFileParams,
@@ -100,48 +101,66 @@ class ActionExecutor:
         except Exception as e:
             return f"Error reading {params.file_path}: {str(e)}"
 
-    def _action_search_file(self, params: SearchFileParams) -> str:
-        """Search within files."""
+    def _get_content_by_scope(
+        self, search_scope: str, latest_first: bool = True, limit: int = 50
+    ) -> List[tuple[str, str]]:
+        """Get file content by search scope, optionally sorted by date. Returns list of (file_path, content) tuples."""
         try:
-            if params.search_scope == "cleaned_sessions":
+            if search_scope == "cleaned_sessions":
                 files = self.file_store.list(get_cleaned_session_filename(self.user_id))
-            elif params.search_scope == "session_analyses":
+            elif search_scope == "session_analyses":
                 files = self.file_store.list(get_session_models_dir(self.user_id))
-            elif params.search_scope == "user_profiles":
+            elif search_scope == "user_profiles":
                 files = [get_overall_user_model_filename(self.user_id)]
             else:
                 files = []
 
-            # Sort files by last_updated if latest_first
-            if params.latest_first:
-                file_times = []
-                for file_path in files:
-                    try:
-                        content = self.file_store.read(file_path)
-                        data = json.loads(content)
-                        last_updated = data.get("last_updated", "1970-01-01")
-                        file_times.append((file_path, last_updated))
-                    except Exception:
-                        file_times.append((file_path, "1970-01-01"))
-                file_times.sort(key=lambda x: str(x[1]), reverse=True)
-                files = [f[0] for f in file_times]
-
-            results = []
-            for file_path in files[:50]:
+            # Read content and prepare for sorting
+            file_content_pairs = []
+            for file_path in files:
                 try:
                     content = self.file_store.read(file_path)
-                    if params.query.lower() in content.lower():
-                        lines = [
-                            line.strip()
-                            for line in content.split("\n")
-                            if params.query.lower() in line.lower()
-                        ][:2]
-                        if lines:
-                            results.append(f"{file_path}:\n" + "\n".join(lines))
-                            if len(results) >= params.max_results:
-                                break
+                    file_content_pairs.append((file_path, content))
                 except Exception:
                     continue
+
+            # Sort by last_updated if latest_first
+            if latest_first and file_content_pairs:
+                file_times = []
+                for file_path, content in file_content_pairs:
+                    try:
+                        data = json.loads(content)
+                        last_updated = data.get("last_updated", "1970-01-01")
+                        file_times.append((file_path, content, last_updated))
+                    except Exception:
+                        file_times.append((file_path, content, "1970-01-01"))
+                file_times.sort(key=lambda x: str(x[2]), reverse=True)
+                file_content_pairs = [(f[0], f[1]) for f in file_times]
+
+            return file_content_pairs[:limit]
+        except Exception:
+            return []
+
+    def _string_search(self, params: SearchFileParams) -> str:
+        """Original string-based search implementation."""
+        try:
+            # Use consolidated content loading (reads files once)
+            file_content_pairs = self._get_content_by_scope(
+                params.search_scope, params.latest_first, 50
+            )
+
+            results = []
+            for file_path, content in file_content_pairs:
+                if params.query.lower() in content.lower():
+                    lines = [
+                        line.strip()
+                        for line in content.split("\n")
+                        if params.query.lower() in line.lower()
+                    ][:2]
+                    if lines:
+                        results.append(f"{file_path}:\n" + "\n".join(lines))
+                        if len(results) >= params.max_results:
+                            break
 
             return (
                 f"Found {len(results)} files:\n\n" + "\n\n".join(results)
@@ -149,7 +168,71 @@ class ActionExecutor:
                 else f"No files found containing '{params.query}'"
             )
         except Exception as e:
-            return f"Search error: {str(e)}"
+            return f"String search error: {str(e)}"
+
+    def _action_search_file(self, params: SearchFileParams) -> str:
+        """Search within files using BM25 or string matching."""
+        if params.search_method == "string_match":
+            return self._string_search(params)
+
+        # BM25 search (default)
+        try:
+            # Use consolidated file loading with date sorting
+            file_content_pairs = self._get_content_by_scope(
+                params.search_scope, params.latest_first, 50
+            )
+
+            # Extract document contents
+            corpus = []
+            file_paths = []
+            for file_path, content in file_content_pairs:
+                corpus.append(content)
+                file_paths.append(file_path)
+
+            if not corpus:
+                return f"No files found in scope '{params.search_scope}'"
+
+            # Create stemmer and tokenize
+            stemmer = Stemmer.Stemmer("english")
+            corpus_tokens = bm25s.tokenize(corpus, stopwords="en", stemmer=stemmer)
+
+            # Build BM25 index
+            retriever = bm25s.BM25()
+            retriever.index(corpus_tokens)
+
+            # Search
+            query_tokens = bm25s.tokenize(params.query, stemmer=stemmer)
+            results, scores = retriever.retrieve(query_tokens, k=params.max_results)
+
+            # Format results
+            formatted_results = []
+            for i in range(results.shape[1]):
+                if i >= len(file_paths):
+                    break
+                doc_idx = results[0, i]
+                score = scores[0, i]
+                if doc_idx >= len(file_paths):
+                    continue
+                file_path = file_paths[doc_idx]
+
+                # Get relevant snippet
+                content = corpus[doc_idx]
+                snippet = content[:10000] + "..." if len(content) > 10000 else content
+
+                formatted_results.append(
+                    f"[Score: {score:.2f}] {file_path}:\n{snippet}"
+                )
+
+            return (
+                f"Found {len(formatted_results)} files (BM25 ranked):\n\n"
+                + "\n\n".join(formatted_results)
+                if formatted_results
+                else f"No relevant files found for '{params.query}'"
+            )
+
+        except Exception as e:
+            logger.warning(f"BM25 search failed: {e}, using string search")
+            return self._string_search(params)
 
     def _action_update_json_field(self, params: UpdateJsonFieldParams) -> str:
         """Update a specific JSON field."""
