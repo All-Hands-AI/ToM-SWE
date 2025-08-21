@@ -29,7 +29,6 @@ from dotenv import load_dotenv
 
 # Local imports
 from tom_swe.generation.dataclass import (
-    InstructionImprovementLLM,
     InstructionImprovement,
     ClarityAssessment,
     AnalyzeSessionParams,
@@ -40,7 +39,6 @@ from tom_swe.generation import (
     LLMClient,
     ActionType,
     ActionResponse,
-    SleepTimeResponse,
     ActionExecutor,
 )
 from tom_swe.prompts import PROMPTS
@@ -196,7 +194,7 @@ class ToMAgent:
             + [
                 {
                     "role": "user",
-                    "content": f"Here is the content of the user model (`overall_user_model.json`): {user_model}",
+                    "content": f"Here is the content of the overall_user_model (`overall_user_model.json`): {user_model}",
                 }
             ]
             + formatted_messages
@@ -243,7 +241,6 @@ class ToMAgent:
                 )
                 result = self._step(
                     messages=propose_instructions_messages,
-                    final_response_model=InstructionImprovementLLM,
                 )
         except Exception as e:
             logger.warning(f"Clarity assessment failed: {e}, exit")
@@ -253,17 +250,13 @@ class ToMAgent:
         final_instruction = format_proposed_instruction(
             original_instruction=original_instruction,
             improved_instruction=result.improved_instruction,
-            reasoning=result.reasoning,
             confidence_score=result.confidence_score,
-            clarity_score=result.clarity_score,
         )
 
         return InstructionImprovement(
             original_instruction=original_instruction,
             improved_instruction=final_instruction,
-            reasoning=result.reasoning,
             confidence_score=result.confidence_score,
-            clarity_score=result.clarity_score,
         )
 
     def _get_relevant_behavior_sync(self, original_instruction: str) -> str:
@@ -357,23 +350,20 @@ class ToMAgent:
         self,
         messages: List[Dict[str, Any]],
         response_model: type = ActionResponse,
-        final_response_model: Optional[type] = None,
         max_iterations: int = 3,
         preset_actions: Optional[List[Any]] = None,
     ) -> Any:
         """
-        Generic workflow controller with optional final response model.
+        Generic workflow controller for action-based workflows.
 
         Args:
-            prompt: The main task prompt
-            response_model: Pydantic model for intermediate workflow steps
-            final_response_model: Optional final response model for structured output
-            system_prompt: Optional system prompt (auto-generated if not provided)
+            messages: The formatted messages list
+            response_model: Pydantic model for workflow steps (default: ActionResponse)
             max_iterations: Maximum workflow iterations
             preset_actions: Optional list of pre-set actions to execute before LLM decisions
 
         Returns:
-            Final result - either from final_response_model or last action result
+            Result from the final action execution
         """
 
         logger.info(f"🤖 Starting workflow with {max_iterations} max iterations")
@@ -381,13 +371,6 @@ class ToMAgent:
 
         for iteration in range(max_iterations):
             logger.info(f"🔄 Workflow iteration {iteration + 1}/{max_iterations}")
-            if (
-                self.skip_memory_collection
-                and final_response_model
-                and final_response_model.__name__ == "InstructionImprovementResponse"
-            ):
-                logger.info("Skipping memory collection for instruction improvement")
-                break
 
             # Use preset actions first, then fall back to LLM
             if preset_actions:
@@ -430,24 +413,8 @@ class ToMAgent:
                 logger.info("✅ Workflow completed successfully")
                 break
 
-        # If final_response_model specified, make final structured call
-        if final_response_model:
-            logger.info(f"🎯 Making final call with {final_response_model.__name__}")
-            final_result: Any = self.llm_client.call_structured_messages(
-                messages=messages
-                + [
-                    {
-                        "role": "assistant",
-                        "content": "Ready to provide final structured result",
-                    }
-                ],
-                output_type=final_response_model,
-                temperature=0.1,
-            )
-            return final_result
-        else:
-            # No final model needed, return action result
-            return result
+        # Return the result from final action execution
+        return result
 
     def sleeptime_compute(
         self,
@@ -560,7 +527,6 @@ class ToMAgent:
         ]
         final_result = self._step(
             messages=messages,
-            final_response_model=SleepTimeResponse,
             preset_actions=preset_actions,
             max_iterations=3,
         )

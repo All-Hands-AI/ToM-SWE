@@ -56,6 +56,12 @@ The agent automatically:
 2. Processes user sessions for better understanding
 3. Shows progress during analysis
 
+## Prompts
+
+The prompts are stored in `tom_swe/prompts/registry.py`.
+You could also find some prompts in `tom_swe/generation/dataclass.py`
+
+
 ## Requirements
 
 - Python 3.8+

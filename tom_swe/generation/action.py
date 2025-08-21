@@ -19,8 +19,9 @@ from tom_swe.generation.dataclass import (
     UpdateJsonFieldParams,
     AnalyzeSessionParams,
     InitializeUserProfileParams,
+    GenerateInstructionImprovementParams,
+    GenerateSleepSummaryParams,
     RagSearchParams,
-    CompleteTaskParams,
     SessionAnalysis,
 )
 from tom_swe.memory.locations import (
@@ -61,7 +62,9 @@ class ActionExecutor:
         self.file_store = file_store or LocalFileStore(root="~/.openhands")
         self.user_id = user_id
 
-    def execute_action(self, action: ActionType, parameters: Any) -> str:
+    def execute_action(
+        self, action: ActionType, parameters: Any
+    ) -> str | GenerateInstructionImprovementParams | GenerateSleepSummaryParams:
         """
         Execute a specific action with given parameters.
 
@@ -75,6 +78,19 @@ class ActionExecutor:
         logger.info(f"🎯 Executing action: {action.value}")
         logger.info(f"📋 Parameters: {parameters}")
 
+        # Handle final response actions - these contain the response data in parameters
+        if action == ActionType.GENERATE_INSTRUCTION_IMPROVEMENT:
+            logger.info(
+                "📤 Final response action: returning instruction improvement data"
+            )
+            assert isinstance(parameters, GenerateInstructionImprovementParams)
+            return parameters  # Return the structured response data directly
+        elif action == ActionType.GENERATE_SLEEP_SUMMARY:
+            logger.info("📤 Final response action: returning sleep summary data")
+            assert isinstance(parameters, GenerateSleepSummaryParams)
+            return parameters  # Return the structured response data directly
+
+        # Handle regular execution actions
         if action == ActionType.READ_FILE:
             return self._action_read_file(parameters)
         elif action == ActionType.SEARCH_FILE:
@@ -377,8 +393,3 @@ class ActionExecutor:
         """Search for relevant context using RAG."""
         # TODO: Implement RAG functionality
         return f"RAG search for '{params.query}' (k={params.k}) - not implemented yet"
-
-    def _action_complete_task(self, params: CompleteTaskParams) -> str:
-        """Mark task as complete."""
-        logger.info("✅ Task marked as complete")
-        return params.result

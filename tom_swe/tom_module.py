@@ -131,7 +131,7 @@ class ToMAnalyzer:
             user_profile=result.user_profile
             or UserProfile(
                 user_id=self.user_id,
-                overall_description="User analysis unavailable",
+                overall_description=["User analysis unavailable"],
                 preference_summary=[],
             ),
             session_summaries=result.session_summaries or [],

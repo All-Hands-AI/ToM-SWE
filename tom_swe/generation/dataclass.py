@@ -29,6 +29,10 @@ class ActionType(Enum):
     # RAG Operations
     RAG_SEARCH = "rag_search"
 
+    # Final Response Actions (contain structured response data in parameters)
+    GENERATE_INSTRUCTION_IMPROVEMENT = "generate_instruction_improvement"
+    GENERATE_SLEEP_SUMMARY = "generate_sleep_summary"
+
 
 # Type-safe parameter models for each action
 class ReadFileParams(BaseModel):
@@ -105,10 +109,25 @@ class RagSearchParams(BaseModel):
     )
 
 
-class CompleteTaskParams(BaseModel):
-    """Parameters for COMPLETE_TASK action."""
+class GenerateInstructionImprovementParams(BaseModel):
+    """Parameters for GENERATE_INSTRUCTION_IMPROVEMENT action - contains the final instruction improvement response."""
 
-    result: str = Field(description="Result message for the completed task")
+    improved_instruction: str = Field(
+        description="Personalized suggestions for the SWE agent on how to better understand and help the user"
+    )
+    confidence_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Confidence score (0-1) for the suggestion quality",
+    )
+
+
+class GenerateSleepSummaryParams(BaseModel):
+    """Parameters for GENERATE_SLEEP_SUMMARY action - contains the final sleep time summary response."""
+
+    summarization: str = Field(
+        description="Summary of what changed during the session processing workflow"
+    )
 
 
 # Union type for all action parameters
@@ -119,6 +138,8 @@ ActionParams = Union[
     AnalyzeSessionParams,
     InitializeUserProfileParams,
     RagSearchParams,
+    GenerateInstructionImprovementParams,
+    GenerateSleepSummaryParams,
 ]
 
 
@@ -133,15 +154,9 @@ class ActionResponse(BaseModel):
     is_complete: bool = False
 
 
-class SleepTimeResponse(BaseModel):
-    """Summary of what changed during session processing workflow."""
-
-    summarization: str
-
-
 class UserMessageAnalysis(BaseModel):
     message_content: str = Field(
-        description="The content of the user message (could be a summarization if the original message is too long)"
+        description="The content of the user message (Try to keep the original message as much as possible unless it's too long or contains too much user copy-pasted content; in a nutshell, try to preserve what the user actually said and include details if possible)"
     )
     emotions: str = Field(
         description=(
@@ -182,7 +197,7 @@ class SessionAnalysisForLLM(BaseModel):
 class SessionSummary(BaseModel):
     session_id: str
     session_tldr: str = Field(
-        description="A short summary of the session, 1-2 sentences"
+        description="A short summary of the session, 1-2 sentences. It's recommended to include some specific details to make it more useful for the SWE agent."
     )
 
 
@@ -192,7 +207,7 @@ class UserProfile(BaseModel):
         description="Overall description of the user's communication patterns, personality, expertise, and behavior"
     )
     preference_summary: List[str] = Field(
-        description="Summarized list of user preferences extracted from all sessions"
+        description="Summarized list of user preferences extracted from all sessions. It's recommended to include some specific details to make it more useful for the SWE agent."
     )
 
 
@@ -205,27 +220,6 @@ class UserAnalysis(BaseModel):
     user_profile: UserProfile
     session_summaries: List[SessionSummary]
     last_updated: str
-
-
-class InstructionImprovementLLM(BaseModel):
-    """Pydantic model for LLM response to instruction improvement requests."""
-
-    reasoning: str = Field(
-        description="Clear reasoning for whether the user's original instruction is clear, focus on what could be missing and what could be inferred from the user's profile and recent sessions."
-    )
-    clarity_score: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Clarity score (0-1) indicating how clear the original user instruction is",
-    )
-    improved_instruction: str = Field(
-        description="Personalized suggestions for the SWE agent on how to better understand and help the user"
-    )
-    confidence_score: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Confidence score (0-1) for the suggestion quality",
-    )
 
 
 class ClarityAssessment(BaseModel):
@@ -248,12 +242,6 @@ class InstructionImprovement(BaseModel):
     improved_instruction: str = Field(
         description="The improved instruction personalized to the user in markdown format"
     )
-    reasoning: str = Field(description="Reasoning for the improvements made")
     confidence_score: float = Field(
         ge=0.0, le=1.0, description="Confidence score for the personalization quality"
-    )
-    clarity_score: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Clarity score (0-1) indicating how clear the original instruction was",
     )

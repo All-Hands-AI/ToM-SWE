@@ -115,36 +115,16 @@ def debug_large_prompt(
 def format_proposed_instruction(
     original_instruction: str,
     improved_instruction: str,
-    reasoning: str,
     confidence_score: float,
-    clarity_score: float,
 ) -> str:
-    """
-    Format the proposed instruction with clarity analysis and interpretation.
-
-    Args:
-        original_instruction: The user's original message
-        improved_instruction: The AI's interpretation of what user meant
-        reasoning: Reasoning for the interpretation
-        confidence_score: Confidence score (0-1) for the suggestions
-        clarity_score: Clarity score (0-1) for the original instruction
-
-    Returns:
-        Formatted instruction with analysis and clarification request
-    """
-
     final_instruction = f"""The user's original message was: '{original_instruction}'
 *****************ToM Agent Analysis Start Here*****************
-(ToM agent reasoning is not from the actual user, but aims to help you better understand the user's intent)
-The clarity score of the original message was: {clarity_score*100:.0f}%, (here's the reasoning: {reasoning}).
-
 Based on the conversation context and user patterns, here's a suggestion to help you better understand and help the user:
-
-## Action Suggestions (IMPORTANT!)
+## Improved Instruction (IMPORTANT!)
 {improved_instruction}
 
-## Confidence in the suggestions
-The ToM agent is {confidence_score*100:.0f}% confident in the suggestions.
+## Confidence in the improved instruction
+The ToM agent is {confidence_score*100:.0f}% confident in the improved instruction.
 """
 
     return final_instruction

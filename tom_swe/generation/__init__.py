@@ -16,7 +16,7 @@ from .output_parsers import PydanticOutputParser
 
 # Note: Prompts moved to tom_swe.prompts.registry for centralized management
 from .action import ActionExecutor
-from .dataclass import ActionType, ActionResponse, SleepTimeResponse
+from .dataclass import ActionType, ActionResponse
 
 __all__ = [
     "PydanticOutputParser",
@@ -25,6 +25,5 @@ __all__ = [
     "create_llm_client",
     "ActionType",
     "ActionResponse",
-    "SleepTimeResponse",
     "ActionExecutor",
 ]
