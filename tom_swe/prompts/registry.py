@@ -44,9 +44,9 @@ The actions you could use are (IMPORTANT: you can only use these actions, there 
 
 - `GENERATE_INSTRUCTION_IMPROVEMENT` to provide the final instruction improvement response in the parameters
     - This action is mandatory and should always be used as the **FINAL** action with `is_complete=true`.
-    - **For improved_instruction**:
+    - **For improved_instruction** (IMPORTANT: Provide the improved instruction as if you are the user):
         - [Recover the true intent of the user] Pretend you are the user and you want to make the instruction more clear and detailed that the user originally wanted but didn't express clearly.
-        - [Hard to recover scenario] If you fail to identify the true intent of the user, be very strong about asking the agent to not do anything concretely without figuring out user intent first. For example, "The instruction is not clear, please ask for a clarification question first."
+        - [Hard to recover scenario] If you fail to identify the true intent of the user, be very strong about asking the agent to not do anything concretely without figuring out user intent first. For example, "The instruction is not clear, ask me what I want to do first."
         - [Empty instruction scenario] If the instruction is empty, you could provide a few potential things that the user might want to work on"
         - [Evidence-based suggestion] Based on user's previous projects (e.g., 'Based on previous projects on ...')
     - **For confidence_score**: Rate your confidence in the suggestion quality (0-1). 0 means not confident at all, 1 means very confident.
