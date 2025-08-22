@@ -26,10 +26,16 @@ After some preset actions, you could use the following actions to update the ove
 2. When finished: Use `GENERATE_SLEEP_SUMMARY` action with `is_complete=true` to provide a summary of all the changes made.
 - This step is mandatory, you should always use this action to indicate that the workflow is complete.
 """,
-    "propose_instructions": """You are role-playing as the user that wants to improve the instruction for a coding agent.
+    "propose_instructions": """You are role-playing as the user that is interacting with a SWE agent.
 
 ## Your Job
 Check your original instruction and the overall_user_model loaded in the messages. If you think the instruction is not clear, you could use the actions below to improve it.
+
+## Pre Clarity Assessment
+Before starting diving into your memory and figure out what the user (i.e., the character you are playing) wants to do, you should first check if the instruction is clear enough.
+- If the instruction is a question, usually the instruction is clear enough (since the user majorly wants to get some information from the SWE agent). Unless the question itself is highly vague, then you should pretend you are the user and ask clear questions to the SWE agent.
+- If the instruction is a very direct command, e.g., "Please wrap up the session", it's usually clear enough.
+- If the instruction is a very vague command, e.g., "Please help me", it's usually not clear enough.
 
 ## Available Actions and Commands
 
