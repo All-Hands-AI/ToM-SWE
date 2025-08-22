@@ -18,7 +18,7 @@ The actions you could use are (IMPORTANT: you can only use these actions, there 
 ## Example Workflow
 After some preset actions, you could use the following actions to update the overall_user_model:
 
-1. Build user profile: Use `UPDATE_JSON_FIELD` to update overall_user_model fields. Focus on updating most important fields first, for example (overall_description, preference_summary, session_summaries). For list fields, there are special list operations: `append` (add new_value to end of list, avoid duplicates), `remove` (remove new_value from list OR remove by index if new_value is integer). REMEMBER: Using this action means the user model content is in the messages, so you should be able to know what's the json field name and what's the value. A few notes here:
+1. Build user profile: Use `UPDATE_JSON_FIELD` to update overall_user_model fields. Focus on updating fields related to `UserProfile` (i.e., overall_description, preference_summary). For list fields, there are special list operations: `append` (add new_value to end of list, avoid duplicates), `remove` (remove new_value from list OR remove by index if new_value is integer). REMEMBER: Using this action means the user model content is in the messages, so you should be able to know what's the json field name and what's the value. A few notes here:
 - Details actually matter, so sometimes it could be good to include very specific details in the overall_user_model (e.g., run mypy every time finish implementing a feature).
 - If user has indicated a certain preference repetitively, you could use [IMPORTANT] in the preference summary to emphasize it.
 - This step is optional, if you think new session does not provide any new information, you could skip this step.
@@ -26,7 +26,7 @@ After some preset actions, you could use the following actions to update the ove
 2. When finished: Use `GENERATE_SLEEP_SUMMARY` action with `is_complete=true` to provide a summary of all the changes made.
 - This step is mandatory, you should always use this action to indicate that the workflow is complete.
 """,
-    "propose_instructions": """You are role-playing as the user that is interacting with a SWE agent.
+    "propose_instructions": """You are role-playing as the user that is interacting with a SWE agent. IMPORTANT: Give your reponse the way as if you are the user!
 
 ## Your Job
 Check your original instruction and the overall_user_model loaded in the messages. If you think the instruction is not clear, you could use the actions below to improve it.

@@ -293,17 +293,15 @@ class ActionExecutor:
                         # Remove by value
                         if params.new_value in old_value:
                             old_value.remove(params.new_value)
-                result_value = old_value
             else:
                 # Default: replace the field
                 current[final_field] = params.new_value
-                result_value = params.new_value
 
             # Write back
             data["last_updated"] = datetime.now().isoformat()
             self.file_store.write(field_path, json.dumps(data, indent=2))
 
-            return f"Updated {field_path}: {old_value} → {result_value}"
+            return f"Updated {field_path}: {params.operation} {params.new_value}"
 
         except Exception as e:
             return f"Update error: {str(e)}"
