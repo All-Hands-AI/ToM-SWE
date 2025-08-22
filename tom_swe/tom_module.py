@@ -1,780 +1,209 @@
-#!/usr/bin/env python3
-"""
-Theory of Mind (ToM) Module for User Behavior Analysis
-
-This module analyzes user interaction data to understand their mental states,
-predict their intentions, and anticipate their next actions based on their
-typed messages and interaction patterns.
-
-The module processes user data from processed_data/*.json files and generates
-comprehensive mental state models saved to data/user_model/.
-"""
-
-# Standard library imports
 import asyncio
-import csv
-import glob
-import json
-import os
-import warnings
-from collections import Counter
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
-import aiofiles  # type: ignore
-import litellm
-
-if TYPE_CHECKING:
-    from tom_swe.generation_utils.generate import LLMClient
+from tom_swe.generation.generate import LLMClient
 
 # Third-party imports
-from dotenv import load_dotenv
-from rich import print
 
-from .database import (
-    OverallUserAnalysis,
-    SessionSummary,
-    UserDescriptionAndPreferences,
-    UserMessageAnalysis,
+from tom_swe.generation.dataclass import (
+    UserAnalysis,
+    SessionAnalysis,
     UserProfile,
+    SessionAnalysisForLLM,
+    SessionSummary,
 )
-from .utils import PydanticOutputParser
-
-# Local imports
-
-warnings.filterwarnings("ignore")
-
-# Load environment variables
-load_dotenv()
-
-# Configure litellm for better error handling
-litellm.set_verbose = False
-
-# Configure LLM proxy settings
-LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
-LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
-DEFAULT_LLM_MODEL = os.getenv(
-    "DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514"
-)
-
-# Constants
-MIN_CLARIFICATION_SEQUENCE = 2
+from tom_swe.memory.locations import get_overall_user_model_filename
+from tom_swe.memory.local import LocalFileStore
+from tom_swe.prompts import PROMPTS
 
 
-class UserMentalStateAnalyzer:
-    """
-    Analyzes user mental states and predicts intentions from their interactions using LLMs.
-
-    This class provides a complete pipeline for analyzing user behavior:
-    1. Load user interaction data
-    2. Analyze individual messages using LLM
-    3. Process sessions and create summaries
-    4. Manage user profiles over time
-    5. Handle all file I/O operations
-    """
-
+class ToMAnalyzer:
     def __init__(
         self,
-        processed_data_dir: str = "./data/processed_data",
-        llm_client: Optional["LLMClient"] = None,
-        model: Optional[str] = None,
+        llm_client: LLMClient,
         session_batch_size: int = 3,
+        user_id: str = "",
     ) -> None:
         """Initialize the analyzer with configuration and validate setup."""
-        self.processed_data_dir = processed_data_dir
         self.session_batch_size = session_batch_size
+        self.user_id = user_id
+        self.llm_client = llm_client
 
-        # Use provided LLM client or create one from legacy parameters
-        if llm_client is not None:
-            self.llm_client = llm_client
-            self.model = llm_client.config.model
-        else:
-            # Legacy initialization - create LLMClient from model parameter
-            from tom_swe.generation_utils.generate import LLMConfig, LLMClient
+    async def analyze_session(self, session_data: Dict[str, Any]) -> SessionAnalysis:
+        """
+        Analyze a complete session and return a session summary.
+        Uses important user messages as focus points with full session context.
+        """
+        session_id = session_data.get("session_id", "unknown")
 
-            self.model = model or DEFAULT_LLM_MODEL
-            config = LLMConfig(
-                model=self.model,
-                api_key=LITELLM_API_KEY,
-                api_base=LITELLM_BASE_URL,
-            )
-            self.llm_client = LLMClient(config)
-
-        self._validate_and_setup_configuration()
-
-    # ===================================================================
-    # INITIALIZATION & CONFIGURATION GROUP
-    # ===================================================================
-
-    def _validate_and_setup_configuration(self) -> None:
-        """Validate and setup LLM configuration."""
-        if not LITELLM_API_KEY:
-            print("Warning: LITELLM_API_KEY not set. LLM analysis will fail.")
-            print(
-                "Please set LITELLM_API_KEY environment variable or create a .env file."
+        if not session_data or "messages" not in session_data:
+            return SessionAnalysis(
+                session_id=session_id,
+                intent="",
+                per_message_analysis=[],
+                user_modeling_summary="No session data available",
+                session_start="",
+                session_end="",
+                last_updated=datetime.now().isoformat(),
             )
 
-        # Set up litellm configuration if we have the required settings
-        if LITELLM_API_KEY and LITELLM_BASE_URL:
-            os.environ["LITELLM_API_KEY"] = LITELLM_API_KEY
-            os.environ["LITELLM_BASE_URL"] = LITELLM_BASE_URL
+        # Extract important user messages and full session context
+        important_user_messages = []
+        all_messages = []
 
-    # ===================================================================
-    # DATA LOADING GROUP
-    # ===================================================================
+        for message in session_data["messages"]:
+            # Build full session context (all messages)
+            role = message.get("source", "unknown")
+            content = message.get("content", "")
+            all_messages.append(f"{role}: {content}")
 
-    async def load_user_data(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Load complete user data from processed_data/{user_id}.json"""
-        user_file = os.path.join(self.processed_data_dir, f"{user_id}.json")
+            # Filter for important user messages
+            if message.get("source") == "user" and message.get("is_important", True):
+                important_user_messages.append(content)
 
-        if not os.path.exists(user_file):
-            return None
+        # If no important messages marked, use all user messages
+        if not important_user_messages:
+            for message in session_data["messages"]:
+                if message.get("source") == "user":
+                    important_user_messages.append(message.get("content", ""))
 
-        try:
-            async with aiofiles.open(user_file, encoding="utf-8") as f:
-                content = await f.read()
-                data: Dict[str, Any] = json.loads(content)
-                return data
-        except Exception as e:
-            print(f"Error loading {user_file}: {e}")
-            return None
+        # Create comprehensive session context with truncation to fit context window
+        def truncate_text_to_tokens(text: str, max_tokens: int = 50000) -> str:
+            """Truncate text to approximately fit within token limit."""
+            # Rough estimate: 1 token ≈ 4 characters for English text
+            max_chars = max_tokens * 4
+            if len(text) <= max_chars:
+                return text
 
-    async def get_user_session_ids(self, user_id: str) -> List[str]:
-        """Get all session IDs for a user from processed_data/{user_id}.json"""
-        user_data = await self.load_user_data(user_id)
-        return list(user_data.keys()) if user_data else []
-
-    async def load_session_data(
-        self, user_id: str, session_id: str
-    ) -> Optional[Dict[str, Any]]:
-        """Load specific session data for a user."""
-        user_data = await self.load_user_data(user_id)
-        if not user_data:
-            return None
-        return user_data.get(session_id)
-
-    def load_studio_results_metadata(
-        self, data_dir: str = "./data"
-    ) -> Dict[str, Dict[str, Any]]:
-        """
-        Load metadata from studio_results_*.csv files.
-        Returns a dictionary with conversation_id as key and metadata as value.
-        """
-        metadata: Dict[str, Dict[str, Any]] = {}
-
-        # Find all studio_results CSV files
-        csv_pattern = os.path.join(data_dir, "studio_results_*.csv")
-        csv_files = glob.glob(csv_pattern)
-
-        if not csv_files:
-            print(f"No studio_results CSV files found in {data_dir}")
-            return metadata
-
-        for csv_file in csv_files:
-            try:
-                with open(csv_file, encoding="utf-8") as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        conversation_id = row.get("conversation_id", "")
-                        if conversation_id:
-                            metadata[conversation_id] = {
-                                "conversation_id": conversation_id,
-                                "github_user_id": row.get("github_user_id", ""),
-                                "selected_repository": row.get(
-                                    "selected_repository", ""
-                                ),
-                                "title": row.get("title", ""),
-                                "last_updated_at": row.get("last_updated_at", ""),
-                                "created_at": row.get("created_at", ""),
-                                "selected_branch": row.get("selected_branch", ""),
-                                "user_id": row.get("user_id", ""),
-                                "accumulated_cost": row.get("accumulated_cost", ""),
-                                "prompt_tokens": row.get("prompt_tokens", ""),
-                                "completion_tokens": row.get("completion_tokens", ""),
-                                "total_tokens": row.get("total_tokens", ""),
-                                "trigger": row.get("trigger", ""),
-                                "pr_number": row.get("pr_number", ""),
-                            }
-                print(f"Loaded {len(metadata)} conversation metadata from {csv_file}")
-            except Exception as e:
-                print(f"Error loading {csv_file}: {e}")
-
-        return metadata
-
-    def extract_user_typed_messages_from_session(
-        self, session_data: Dict[str, Any]
-    ) -> List[Tuple[str, List[str]]]:
-        """
-        Extract user-typed messages from session data with their context.
-        Returns list of (message_content, session_context) tuples.
-        """
-        if not session_data or "convo_events" not in session_data:
-            return []
-
-        session_context = []
-        user_typed_messages = []
-
-        for event in session_data["convo_events"]:
-            session_context.append(str(event))
-            if event.get("source") == "user":
-                content = event.get("content", "")
-                if self.categorize_message_type(content) == "user_typed":
-                    user_typed_messages.append((content, session_context.copy()))
-
-        return user_typed_messages
-
-    def categorize_message_type(self, content: str) -> str:
-        """
-        Categorize user messages into typed vs micro-agent triggered.
-        (Reusing logic from user_interaction_analysis.py)
-        """
-        system_tags = [
-            "<REPOSITORY_INFO>",
-            "<REPOSITORY_INSTRUCTIONS>",
-            "<EXTRA_INFO>",
-            "<RUNTIME_INFORMATION>",
-            "<WORKSPACE_FILES>",
-            "<CURSOR_POSITION>",
-            "<DIAGNOSTICS>",
-            "<SEARCH_RESULTS>",
-        ]
-
-        for tag in system_tags:
-            if tag in content:
-                return "micro_agent_triggered"
-
-        return "user_typed"
-
-    # ===================================================================
-    # LLM SERVICE GROUP
-    # ===================================================================
-
-    async def call_llm(
-        self,
-        prompt: str,
-        temperature: float = 0.3,
-        max_tokens: Optional[int] = None,
-        response_format: Optional[Any] = None,
-    ) -> Optional[str]:
-        """
-        Call the LLM with error handling and retries using LLMClient.
-        """
-        if not self.llm_client.config.api_key:
-            print("LLM API key not configured. Skipping LLM analysis.")
-            return None
-
-        try:
-            # TODO: Handle response_format parameter - LLMClient doesn't support it yet
-            if response_format is not None:
-                import logging
-
-                logger = logging.getLogger(__name__)
-                logger.warning(
-                    "response_format parameter is not yet supported by LLMClient"
-                )
-
-            result = await self.llm_client.call_structured_async(
-                prompt=prompt,
-                output_type=response_format,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            return str(result) if result is not None else None
-
-        except Exception as e:
-            print(f"Error calling LLM ({self.model}): {e}")
-            return None
-
-    def build_message_analysis_prompt(
-        self, message: str, session_context: Optional[List[str]] = None
-    ) -> str:
-        """Build the prompt for analyzing a single user message."""
-        parser: PydanticOutputParser[UserMessageAnalysis] = PydanticOutputParser(
-            pydantic_object=UserMessageAnalysis
-        )
-        format_instructions = parser.get_format_instructions()
-
-        # Build context from previous messages in session
-        context_str = "\n".join(session_context or [])
-        context_info = f"""
-Session context (recent messages):
-{context_str}
-"""
-
-        return f"""
-Analyze this user message to a coding assistant across four dimensions. Provide your analysis in JSON format.
-
-{context_info}Current user message: "{message}"
-
-{format_instructions}
-"""
-
-    async def generate_overall_user_description(
-        self, analysis: OverallUserAnalysis
-    ) -> UserDescriptionAndPreferences:
-        """Generate an overall description of the user and preference summary using LLM based on session summaries"""
-        summaries = analysis.session_summaries
-        profile = analysis.user_profile
-
-        if not summaries:
-            return UserDescriptionAndPreferences(
-                description="New user with no session history yet.", preferences=[]
+            # Truncate from the middle to keep both beginning and end context
+            half_chars = max_chars // 2
+            return (
+                text[:half_chars]
+                + f"\n\n[... TRUNCATED {len(text) - max_chars} characters ...]\n\n"
+                + text[-half_chars:]
             )
 
-        # Collect user modeling insights from all sessions
-        user_insights = []
-        for summary in summaries:
-            if summary.user_modeling_summary:
-                user_insights.append(summary.user_modeling_summary)
-
-        # Collect all preferences from session summaries
-        all_preferences = []
-        for summary in summaries:
-            all_preferences.extend(summary.key_preferences)
-
-        # Prepare data for LLM prompt
-        insights_text = (
-            "; ".join(user_insights)
-            if user_insights
-            else "No specific insights available"
+        full_session_context = truncate_text_to_tokens(
+            "\n".join(all_messages), max_tokens=100000
         )
-        intent_summary = ", ".join(
-            [
-                f"{intent}: {count}"
-                for intent, count in profile.intent_distribution.items()
-            ]
-        )
-        emotion_summary = ", ".join(
-            [
-                f"{emotion}: {count}"
-                for emotion, count in profile.emotion_distribution.items()
-            ]
-        )
-        all_preferences_text = (
-            ", ".join(set(all_preferences))
-            if all_preferences
-            else "No specific preferences identified"
+        key_user_messages = truncate_text_to_tokens(
+            "\n".join(important_user_messages), max_tokens=30000
         )
 
-        # Use Pydantic parser for structured output
-        parser: PydanticOutputParser[
-            UserDescriptionAndPreferences
-        ] = PydanticOutputParser(pydantic_object=UserDescriptionAndPreferences)
-        format_instructions = parser.get_format_instructions()
-
-        # Single LLM call for both description and preferences
-        combined_prompt = f"""
-Based on the following user interaction data, analyze this user and provide both an overall description and key preferences:
-
-User ID: {profile.user_id}
-Total Sessions: {profile.total_sessions}
-Session Insights: {insights_text}
-Intent Distribution: {intent_summary}
-Emotion Distribution: {emotion_summary}
-Observed Preferences: {all_preferences_text}
-
-{format_instructions}
-"""
-
-        # Make single LLM call with structured response format
-        result = await self.call_llm(
-            combined_prompt, response_format=parser.pydantic_object
-        )
-        if not result:
-            return UserDescriptionAndPreferences(
-                description="New user with no session history yet.", preferences=[]
-            )
-        parsed_result: UserDescriptionAndPreferences = parser.parse(result)
-        return parsed_result
-
-    # ===================================================================
-    # MESSAGE ANALYSIS GROUP
-    # ===================================================================
-
-    async def analyze_single_message(
-        self, message: str, session_context: Optional[List[str]] = None
-    ) -> UserMessageAnalysis:
-        """
-        Comprehensive analysis of a user message to extract intent, emotions, preferences, and constraints.
-        """
-        parser: PydanticOutputParser[UserMessageAnalysis] = PydanticOutputParser(
-            pydantic_object=UserMessageAnalysis
-        )
-        prompt = self.build_message_analysis_prompt(message, session_context)
-
-        print("\n[bold blue]Analyzing user message:[/bold blue]")
-        print(f"[yellow]{message}[/yellow]")
-
-        result = await self.call_llm(prompt, response_format=parser.pydantic_object)
-
-        if not result:
-            return UserMessageAnalysis(
-                intent="general",
-                emotions=["neutral"],
-                preference=["minimal"],
-                user_modeling="",
-                should_ask_clarification=False,
-            )
-
-        structured_result: UserMessageAnalysis = parser.parse(result)
-        print("\n[bold green]Result:[/bold green]")
-        print(structured_result)
-        return structured_result
-
-    async def analyze_all_session_messages(
-        self, user_id: str, session_id: str
-    ) -> Optional[Tuple[List[UserMessageAnalysis], List[str]]]:
-        """
-        Analyze all user messages in a session.
-        Returns tuple of (analyses_list, user_messages_list) or None if no data found.
-        """
-        session_data = await self.load_session_data(user_id, session_id)
-        if not session_data:
-            return None
-
-        user_typed_messages = self.extract_user_typed_messages_from_session(
-            session_data
-        )
-        if not user_typed_messages:
-            return [], []
-
-        user_analyses: List[UserMessageAnalysis] = []
-        user_messages: List[str] = []
-
-        # Process messages sequentially to maintain time dependencies
-        for content, context in user_typed_messages:
-            analysis = await self.analyze_single_message(content, context)
-            user_analyses.append(analysis)
-            user_messages.append(content)
-
-        return user_analyses, user_messages
-
-    # ===================================================================
-    # SESSION PROCESSING GROUP
-    # ===================================================================
-
-    def create_session_summary_from_analyses(
-        self,
-        session_id: str,
-        analyses_list: List[UserMessageAnalysis],
-        session_metadata: Dict[str, Any],
-    ) -> Optional[SessionSummary]:
-        """Create session summary from list of UserMessageAnalysis objects"""
-        if not analyses_list:
-            return None
-
-        # Count intents and emotions
-        intent_counter = Counter(a.intent for a in analyses_list)
-        all_emotions = [emotion for a in analyses_list for emotion in a.emotions]
-        emotion_counter = Counter(all_emotions)
-
-        # Collect preferences
-        all_preferences = []
-        for a in analyses_list:
-            if a.preference and a.preference != ["none"]:
-                all_preferences.extend(a.preference)
-
-        # Count clarification requests
-        clarification_count = sum(
-            1 for a in analyses_list if a.should_ask_clarification
-        )
-
-        # Aggregate user modeling insights
-        user_insights = [
-            a.user_modeling for a in analyses_list if a.user_modeling.strip()
-        ]
-        user_modeling_summary = "; ".join(user_insights[:3])  # Take first 3
-
-        return SessionSummary(
+        prompt = PROMPTS["session_analysis"].format(
+            full_session_context=full_session_context,
+            key_user_messages=key_user_messages,
             session_id=session_id,
-            timestamp=datetime.now(),
-            message_count=len(analyses_list),
-            intent_distribution=dict(intent_counter),
-            emotion_distribution=dict(emotion_counter),
-            key_preferences=list(set(all_preferences)),
-            user_modeling_summary=user_modeling_summary,
-            clarification_requests=clarification_count,
-            session_start=session_metadata.get("convo_start", ""),
-            session_end=session_metadata.get("convo_end", ""),
+            total_messages=len(session_data["messages"]),
+            important_user_messages=len(important_user_messages),
+        )
+        result = await self.llm_client.call_structured_async(
+            prompt=prompt,
+            output_type=SessionAnalysisForLLM,
         )
 
-    def calculate_session_metrics(
-        self, analyses_list: List[UserMessageAnalysis]
-    ) -> Dict[str, Any]:
-        """Calculate various metrics for a session."""
-        if not analyses_list:
-            return {}
+        session_analysis = SessionAnalysis(
+            session_id=session_id,
+            user_modeling_summary=result.user_modeling_summary,
+            intent=result.intent,
+            per_message_analysis=result.per_message_analysis,
+            session_start=session_data.get("start_time") or "",
+            session_end=session_data.get("end_time") or "",
+            session_tldr=result.session_tldr,
+            last_updated=datetime.now().isoformat(),
+        )
 
-        return {
-            "total_messages": len(analyses_list),
-            "intent_distribution": dict(Counter(a.intent for a in analyses_list)),
-            "emotion_distribution": dict(
-                Counter(emotion for a in analyses_list for emotion in a.emotions)
-            ),
-            "clarification_ratio": sum(
-                1 for a in analyses_list if a.should_ask_clarification
-            )
-            / len(analyses_list),
-            "unique_preferences": len(
-                {pref for a in analyses_list for pref in a.preference if pref != "none"}
-            ),
-        }
+        # Auto-update overall_user_model if it exists
+        file_store = LocalFileStore("usermodeling")
+        user_model_path = get_overall_user_model_filename(self.user_id)
+        if file_store.exists(user_model_path):
+            await self._auto_update_user_model(session_analysis)
 
-    # ===================================================================
-    # USER PROFILE MANAGEMENT GROUP
-    # ===================================================================
+        return session_analysis
 
-    async def load_existing_user_profile(
-        self, user_id: str, base_dir: str = "./data/user_model"
-    ) -> Optional[OverallUserAnalysis]:
-        """Load existing user profile or return None if not found."""
-        overall_path = os.path.join(base_dir, "user_model_overall", f"{user_id}.json")
-
-        if not os.path.exists(overall_path):
-            return None
-
+    async def _auto_update_user_model(self, session_analysis: SessionAnalysis) -> None:
+        """Auto-update the overall user model with new session information."""
         try:
-            async with aiofiles.open(overall_path, encoding="utf-8") as f:
-                content = await f.read()
-                existing_data = json.loads(content)
-            return OverallUserAnalysis(**existing_data)
-        except Exception as e:
-            print(f"Error loading existing profile for {user_id}: {e}")
-            return None
+            import json
 
-    def create_new_user_profile(self, user_id: str) -> OverallUserAnalysis:
-        """Create new OverallUserAnalysis"""
-        user_profile = UserProfile(
-            user_id=user_id,
-            total_sessions=0,
-            overall_description="",
-            intent_distribution={},
-            emotion_distribution={},
-            preference_summary=[],
-        )
+            # Use LocalFileStore for file operations
+            file_store = LocalFileStore("usermodeling")
+            user_model_path = get_overall_user_model_filename(self.user_id)
 
-        return OverallUserAnalysis(
-            user_profile=user_profile, session_summaries=[], last_updated=datetime.now()
-        )
+            # Load existing user model (we know it exists from the condition)
+            user_model_content = file_store.read(user_model_path)
+            user_model = json.loads(user_model_content)
 
-    def update_user_profile_with_session(self, analysis: OverallUserAnalysis) -> None:
-        """Update user profile based on session summaries"""
-        summaries = analysis.session_summaries
-        profile = analysis.user_profile
-
-        # Update basic stats
-        profile.total_sessions = len(summaries)
-
-        # Aggregate intent distribution
-        intent_counts: Counter[str] = Counter()
-        for summary in summaries:
-            for intent, count in summary.intent_distribution.items():
-                intent_counts[intent] += count
-        profile.intent_distribution = dict(intent_counts)
-
-        # Aggregate emotion distribution
-        emotion_counts: Counter[str] = Counter()
-        for summary in summaries:
-            for emotion, count in summary.emotion_distribution.items():
-                emotion_counts[emotion] += count
-        profile.emotion_distribution = dict(emotion_counts)
-
-        # Note: overall_description will be generated by LLM in async method
-
-    async def save_updated_user_profile(
-        self,
-        user_id: str,
-        new_session_summaries: List[SessionSummary],
-        base_dir: str = "./data/user_model",
-    ) -> None:
-        """Load existing analysis, add new sessions, update user profile and save."""
-        if not new_session_summaries:
-            print(f"No session summaries to update for user {user_id}")
-            return
-
-        self.ensure_directory_structure(base_dir)
-
-        # Load existing or create new
-        analysis = await self.load_existing_user_profile(user_id, base_dir)
-        if not analysis:
-            analysis = self.create_new_user_profile(user_id)
-
-        # Add all new session summaries
-        analysis.session_summaries.extend(new_session_summaries)
-        analysis.last_updated = datetime.now()
-
-        # Update user profile
-        self.update_user_profile_with_session(analysis)
-
-        # Generate overall description using LLM
-        description_and_preferences = await self.generate_overall_user_description(
-            analysis
-        )
-        analysis.user_profile.overall_description = (
-            description_and_preferences.description
-        )
-        analysis.user_profile.preference_summary = (
-            description_and_preferences.preferences
-        )
-
-        # Save updated analysis
-        overall_path = os.path.join(base_dir, "user_model_overall", f"{user_id}.json")
-        try:
-            async with aiofiles.open(overall_path, "w", encoding="utf-8") as f:
-                await f.write(json.dumps(analysis.model_dump(), indent=2, default=str))
-            print(
-                f"Updated user profile for {user_id} with {len(new_session_summaries)} new sessions"
-            )
-        except Exception as e:
-            print(f"Error saving user profile: {e}")
-
-    # ===================================================================
-    # FILE MANAGEMENT GROUP
-    # ===================================================================
-
-    def ensure_directory_structure(self, base_dir: str = "./data/user_model") -> None:
-        """Create necessary directory structure"""
-        detailed_dir = os.path.join(base_dir, "user_model_detailed")
-        overall_dir = os.path.join(base_dir, "user_model_overall")
-
-        os.makedirs(detailed_dir, exist_ok=True)
-        os.makedirs(overall_dir, exist_ok=True)
-
-    async def save_session_analyses_to_json(
-        self,
-        user_id: str,
-        session_id: str,
-        analysis_data: Tuple[List[UserMessageAnalysis], List[str]],
-        session_metadata: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        """Save per-message analyses to JSON file with original user messages and metadata"""
-        base_dir = "./data/user_model"  # Use default base directory
-        analyses_list, user_messages = analysis_data
-        self.ensure_directory_structure(base_dir)
-
-        user_dir = os.path.join(base_dir, "user_model_detailed", user_id)
-        os.makedirs(user_dir, exist_ok=True)
-
-        json_path = os.path.join(user_dir, f"{session_id}.json")
-
-        # Prepare message analyses as a list
-        message_analyses = []
-        for i, (analysis, user_message) in enumerate(zip(analyses_list, user_messages)):
-            message_data = {
-                "message_index": i,
-                "timestamp": datetime.now().isoformat(),
-                "original_message": user_message,
-                "analysis": analysis.model_dump(),
+            # Add new session summary to the model
+            new_session_summary = {
+                "session_id": session_analysis.session_id,
+                "session_tldr": session_analysis.session_tldr,
             }
-            message_analyses.append(message_data)
 
-        # Prepare final JSON structure with metadata and analyses
-        session_data = {
-            "session_id": session_id,
-            "user_id": user_id,
-            "metadata": session_metadata or {},
-            "message_analyses": message_analyses,
-            "summary": {
-                "total_messages": len(analyses_list),
-                "created_at": datetime.now().isoformat(),
-            },
-        }
+            # Update session summaries (keep latest 50)
+            user_model["session_summaries"] = user_model.get("session_summaries", [])
+            user_model["session_summaries"].append(new_session_summary)
+            if len(user_model["session_summaries"]) > 50:
+                user_model["session_summaries"] = user_model["session_summaries"][-50:]
 
-        try:
-            async with aiofiles.open(json_path, "w", encoding="utf-8") as f:
-                await f.write(json.dumps(session_data, indent=2, default=str))
-            print(f"Saved {len(analyses_list)} message analyses to {json_path}")
+            # Update timestamp
+            user_model["last_updated"] = datetime.now().isoformat()
+
+            # Save updated model
+            updated_content = json.dumps(user_model, indent=2)
+            file_store.write(user_model_path, updated_content)
+
         except Exception as e:
-            print(f"Error saving analyses to {json_path}: {e}")
+            # Log error but don't fail the session analysis
+            print(f"Warning: Failed to auto-update user model: {e}")
 
-    # ===================================================================
-    # ORCHESTRATION GROUP - Main Pipeline Methods
-    # ===================================================================
+    async def initialize_user_analysis(
+        self, session_summaries: List[SessionAnalysis]
+    ) -> UserAnalysis:
+        """Initialize UserAnalysis from latest 50 session summaries using LLM."""
+        # Take only the latest 50 sessions
+        # Create prompt with session data
+        sessions_text = [s.model_dump() for s in session_summaries]
 
-    async def _process_session_batch(
+        prompt = PROMPTS["user_analysis"].format(
+            user_id=self.user_id,
+            num_sessions=len(session_summaries),
+            sessions_text=sessions_text,
+        )
+
+        result = await self.llm_client.call_structured_async(
+            prompt=prompt,
+            output_type=UserProfile,
+        )
+
+        return UserAnalysis(
+            user_profile=result
+            or UserProfile(
+                user_id=self.user_id,
+                overall_description=["User analysis unavailable"],
+                preference_summary=[],
+            ),
+            session_summaries=[
+                SessionSummary(
+                    session_id=s.session_id,
+                    session_tldr=s.session_tldr,
+                )
+                for s in session_summaries
+            ],
+            last_updated=datetime.now().isoformat(),
+        )
+
+    async def process_session_batch(
         self,
-        user_id: str,
-        session_batch: List[str],
-        studio_metadata: Dict[str, Dict[str, Any]],
-        base_dir: str,
-    ) -> List[SessionSummary]:
+        session_batch: List[Dict[str, Any]],
+    ) -> List[SessionAnalysis]:
         """
         Process a batch of sessions concurrently.
         Returns list of successfully processed session summaries.
         """
-
-        async def process_single_session_with_metadata(
-            session_id: str,
-        ) -> Optional[SessionSummary]:
-            session_metadata = studio_metadata.get(session_id, {})
-            if session_metadata:
-                print(
-                    f"Found metadata for session {session_id}: {session_metadata.get('title', 'No title')}"
-                )
-            else:
-                print(f"No metadata found for session {session_id}")
-
-            return await self.process_and_save_single_session(
-                user_id, session_id, session_metadata, base_dir
-            )
-
         # Process all sessions in the batch concurrently
-        tasks = [
-            process_single_session_with_metadata(session_id)
-            for session_id in session_batch
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        tasks = [self.analyze_session(session_data) for session_data in session_batch]
+        results = await asyncio.gather(*tasks)
 
-        # Collect successful session summaries
-        session_summaries: List[SessionSummary] = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                print(f"Error processing session {session_batch[i]}: {result}")
-            elif isinstance(result, SessionSummary):
-                session_summaries.append(result)
-
-        return session_summaries
-
-    async def process_and_save_single_session(
-        self,
-        user_id: str,
-        session_id: str,
-        session_metadata: Optional[Dict[str, Any]] = None,
-        base_dir: str = "./data/user_model",
-    ) -> Optional[SessionSummary]:
-        """
-        Complete analysis pipeline for one session, excluding user profile update.
-        Returns SessionSummary if successful, None otherwise.
-        """
-        print(f"\nProcessing session {session_id} for user {user_id}")
-
-        # Step 1: Get per-message analyses
-        result = await self.analyze_all_session_messages(user_id, session_id)
-        if not result:
-            print(f"No analyses found for session {session_id}")
-            return None
-
-        analyses, user_messages = result
-        if not analyses:
-            print(f"No analyses found for session {session_id}")
-            return None
-
-        # Get session metadata for summary
-        session_data = await self.load_session_data(user_id, session_id)
-        session_summary_metadata = session_data or {}
-
-        # Step 2: Save to JSON (Tier 1) with studio_results metadata
-        await self.save_session_analyses_to_json(
-            user_id, session_id, (analyses, user_messages), session_metadata
-        )
-
-        # Step 3: Create session summary (Tier 2)
-        session_summary = self.create_session_summary_from_analyses(
-            session_id, analyses, session_summary_metadata
-        )
-        if not session_summary:
-            print(f"Could not create session summary for {session_id}")
-            return None
-
-        print(f"✅ Completed analysis for session {session_id}")
-        return session_summary
+        return results

@@ -1,8 +1,17 @@
 import json
-from typing import Generic, Type, TypeVar
+import logging
+from typing import Generic, Type, TypeVar, Optional
 
 import json_repair
 from pydantic import BaseModel
+
+try:
+    from tom_swe.logging_config import get_tom_swe_logger
+
+    logger = get_tom_swe_logger(__name__)
+except ImportError:
+    # Fallback for standalone use
+    logger = logging.getLogger(__name__)
 
 OutputType = TypeVar("OutputType", bound=object)
 T = TypeVar("T", bound=BaseModel)
@@ -77,3 +86,46 @@ def split_text_for_embedding(text: str, max_tokens: int = 8191) -> list[str]:
             start = end
 
         return chunks
+
+
+def debug_large_prompt(
+    prompt: str, user_context: Optional[object] = None, relevant_behavior: str = ""
+) -> None:
+    """Debug large prompts by logging details and saving to file."""
+    prompt_length = len(prompt)
+
+    if prompt_length > 50000:  # If prompt is suspiciously large
+        logger.warning(f"⚠️  LARGE PROMPT DETECTED: {prompt_length:,} characters")
+
+        if user_context and hasattr(user_context, "mental_state_summary"):
+            logger.info(
+                f"  - Mental state summary length: {len(user_context.mental_state_summary or ''):,}"
+            )
+        if user_context and hasattr(user_context, "preferences"):
+            logger.info(f"  - Preferences count: {len(user_context.preferences or [])}")
+
+        logger.info(f"  - RAG behavior snippet: {relevant_behavior[:200]}...")
+
+        # Save full prompt to file for inspection
+        with open("/tmp/large_prompt_debug.txt", "w") as f:
+            f.write(prompt)
+        logger.info("  - Full prompt saved to /tmp/large_prompt_debug.txt")
+
+
+def format_proposed_instruction(
+    original_instruction: str,
+    improved_instruction: str,
+    confidence_score: float,
+) -> str:
+    final_instruction = f"""The user's original message was: '{original_instruction}'
+*****************ToM Agent Analysis Start Here*****************
+Based on the conversation context and user patterns, here's a suggestion to help you better understand and help the user:
+
+## Improved Instruction (IMPORTANT!)
+{improved_instruction}
+
+## Confidence in the improved instruction
+The ToM agent is {confidence_score*100:.0f}% confident in the improved instruction.
+"""
+
+    return final_instruction

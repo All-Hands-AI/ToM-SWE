@@ -26,6 +26,7 @@ import numpy as np
 from dotenv import load_dotenv
 from litellm import completion, embedding
 from tqdm import tqdm
+from tom_swe.prompts import PROMPTS
 
 # Token counting
 try:
@@ -39,10 +40,14 @@ load_dotenv()
 # Configure litellm for better error handling
 litellm.set_verbose = False
 
-# Configure logging - use environment variable for level
-log_level = os.getenv("LOG_LEVEL", "info").upper()
-logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
-logger = logging.getLogger(__name__)
+# Get logger that properly integrates with parent applications like OpenHands
+try:
+    from tom_swe.logging_config import get_tom_swe_logger
+
+    logger = get_tom_swe_logger(__name__)
+except ImportError:
+    # Fallback for standalone use
+    logger = logging.getLogger(__name__)
 
 # LiteLLM configuration
 DEFAULT_LLM_MODEL = os.getenv(
@@ -725,13 +730,9 @@ class VectorDB:
             Condensed content or None if condensation fails
         """
         try:
-            prompt = f"""Please condense the following message to max {max_tokens} tokens (do not exceed the limit, and do not add any extra information).
-FOCUS: Keep the most important information that provides context for understanding a conversation.
-
-Original message:
-{content}
-
-Condensed version:"""
+            prompt = PROMPTS["message_condensation"].format(
+                max_tokens=max_tokens, content=content
+            )
 
             # Use efficient model for condensation
             response = completion(

@@ -11,13 +11,36 @@ Requirements:
 """
 
 import os
-
+import json
 from dotenv import load_dotenv
 
 from tom_swe.tom_agent import ToMAgent, ToMAgentConfig
 
 # Load environment variables
 load_dotenv()
+
+
+def test_sleeptime():
+    """Test the sleeptime_compute function."""
+
+    print("🔄 Testing sleeptime_compute function")
+    print("=" * 40)
+
+    # Example session data matching the format you provided
+    # example_sessions_data = [json.load(open("example.json"))]
+    sessions_data = []
+    for file in os.listdir("./data/example_sessions"):
+        session_data = json.load(open(f"./data/example_sessions/{file}"))
+        sessions_data.append(session_data)
+
+    agent = ToMAgent()
+    agent.sleeptime_compute(sessions_data)
+
+    print("✅ Sessions processed and saved successfully!")
+    # Clean up test data after showing results
+    # if test_dir.exists():
+    #     shutil.rmtree(test_dir)
+    #     print(f"\n🧹 Cleaned up test data: {test_dir}")
 
 
 def main():
@@ -33,16 +56,12 @@ def main():
     try:
         # Initialize ToM Agent
         print("\n1. Initializing ToM Agent...")
-        config = ToMAgentConfig(
-            processed_data_dir="./data/processed_data",
-            user_model_dir="./data/user_model",
-            enable_rag=False,
-        )
+        config = ToMAgentConfig()
         agent = ToMAgent(config)
         print("✅ Agent initialized successfully")
 
         # Example instruction to improve
-        user_id = "default_user"  # Use default_user for demo
+        user_id = ""  # Use default_user for demo
         instruction = "Fix my code"
         context = "User is working on a Python web application"
 
@@ -50,11 +69,27 @@ def main():
         print(f"   User: {user_id}")
         print(f"   Context: {context}")
 
-        # Get improved instructions
+        # Create formatted messages with caching support
+        formatted_messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant.",
+                "cache_control": {"type": "ephemeral"},  # Cache system message
+            },
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": context}],  # Context message
+            },
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": instruction}],  # Main instruction
+            },
+        ]
+
+        # Get improved instructions using new API
         recommendation = agent.propose_instructions(
             user_id=user_id,
-            original_instruction=instruction,
-            user_msg_context=context,
+            formatted_messages=formatted_messages,
         )
 
         # Show results
@@ -73,4 +108,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Test the sleeptime function first
+    test_sleeptime()
+    # print("\n" + "=" * 50 + "\n")
+
+    # Then run the main ToM agent demo
+    # main()

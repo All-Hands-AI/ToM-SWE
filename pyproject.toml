@@ -27,6 +27,9 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
     "httpx>=0.25.0",
+    # BM25 search dependencies
+    "bm25s>=0.2.0",
+    "PyStemmer>=2.2.0",
 ]
 
 [project.optional-dependencies]

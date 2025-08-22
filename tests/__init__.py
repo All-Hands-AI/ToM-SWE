@@ -1,1 +1,1 @@
-# Tests package for tom_module
+# Tests package for ToM-SWE

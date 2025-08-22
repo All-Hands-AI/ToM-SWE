@@ -6,12 +6,19 @@ predict their intentions, and anticipate their next actions based on their
 typed messages and interaction patterns using Large Language Models.
 """
 
-from tom_swe.database import (
-    InstructionImprovementResponse,
-    InstructionRecommendation,
-    OverallUserAnalysis,
-    SessionSummary,
-    UserContext,
+# Auto-configure logging for integration with parent applications
+try:
+    from tom_swe.logging_config import auto_configure_logging
+
+    auto_configure_logging()
+except ImportError:
+    # Logging configuration not available, continue without it
+    pass
+
+from tom_swe.generation.dataclass import (
+    InstructionImprovement,
+    UserAnalysis,
+    SessionAnalysis,
     UserMessageAnalysis,
     UserProfile,
 )
@@ -29,7 +36,10 @@ from tom_swe.tom_agent import (
     create_tom_agent,
 )
 from tom_swe.tom_module import (
-    UserMentalStateAnalyzer,
+    ToMAnalyzer,
+)
+from tom_swe.memory.conversation_processor import (
+    CleanSessionStore,
 )
 
 __version__ = "1.0.0"
@@ -39,15 +49,13 @@ __description__ = "LLM-powered Theory of Mind analysis for user behavior predict
 __all__ = [
     "ChunkingConfig",
     "Document",
-    "InstructionImprovementResponse",
-    "InstructionRecommendation",
-    "OverallUserAnalysis",
+    "InstructionImprovement",
+    "UserAnalysis",
     "RAGAgent",
     "RetrievalResult",
-    "SessionSummary",
+    "SessionAnalysis",
     "ToMAgent",
-    "UserContext",
-    "UserMentalStateAnalyzer",
+    "ToMAnalyzer",
     "UserMessageAnalysis",
     "UserProfile",
     "VectorDB",
@@ -55,4 +63,5 @@ __all__ = [
     "create_tom_agent",
     "load_processed_data",
     "load_user_model_data",
+    "CleanSessionStore",
 ]
