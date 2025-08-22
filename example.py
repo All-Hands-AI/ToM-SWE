@@ -28,12 +28,14 @@ def test_sleeptime():
 
     # Example session data matching the format you provided
     # example_sessions_data = [json.load(open("example.json"))]
-    session_data = json.load(open("example.json"))
-    session_data["session_id"] = "test_session_1"
-    example_sessions_data = [session_data]
+    sessions_data = []
+    for file in os.listdir("./data/example_sessions"):
+        session_data = json.load(open(f"./data/example_sessions/{file}"))
+        sessions_data.append(session_data)
 
+    breakpoint()
     agent = ToMAgent()
-    agent.sleeptime_compute(example_sessions_data)
+    agent.sleeptime_compute(sessions_data)
 
     print("✅ Sessions processed and saved successfully!")
     # Clean up test data after showing results
@@ -108,8 +110,8 @@ def main():
 
 if __name__ == "__main__":
     # Test the sleeptime function first
-    # test_sleeptime()
+    test_sleeptime()
     # print("\n" + "=" * 50 + "\n")
 
     # Then run the main ToM agent demo
-    main()
+    # main()

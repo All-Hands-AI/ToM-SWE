@@ -496,15 +496,17 @@ class ToMAgent:
         except FileNotFoundError:
             # No cleaned sessions directory exists yet
             cleaned_session_ids = []
+            return
         # Find sessions that don't have corresponding model files
         unprocessed_sessions = [
             cleaned_session_ids[-1]
         ]  # always process the most recent session as we don't know whether such session is updated.
-        for session_id in cleaned_session_ids:
+        for session_id in cleaned_session_ids[:-1]:
             model_file = get_session_model_filename(session_id, user_id)
             if not self.file_store.exists(model_file):
                 unprocessed_sessions.append(session_id)
         logger.info(f"🔍 Unprocessed sessions: {unprocessed_sessions}")
+
         preset_actions = []
         if unprocessed_sessions:
             # Step 3: Create preset action for batch processing unprocessed sessions

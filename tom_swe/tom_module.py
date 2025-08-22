@@ -13,7 +13,6 @@ from tom_swe.generation.dataclass import (
     SessionAnalysisForLLM,
     UserAnalysisForLLM,
 )
-from .utils import PydanticOutputParser
 from tom_swe.prompts import PROMPTS
 
 
@@ -67,12 +66,27 @@ class ToMAnalyzer:
                 if message.get("source") == "user":
                     important_user_messages.append(message.get("content", ""))
 
-        # Create comprehensive session context
-        full_session_context = "\n".join(all_messages)
-        key_user_messages = "\n".join(important_user_messages)
+        # Create comprehensive session context with truncation to fit context window
+        def truncate_text_to_tokens(text: str, max_tokens: int = 50000) -> str:
+            """Truncate text to approximately fit within token limit."""
+            # Rough estimate: 1 token ≈ 4 characters for English text
+            max_chars = max_tokens * 4
+            if len(text) <= max_chars:
+                return text
 
-        parser: PydanticOutputParser[SessionAnalysisForLLM] = PydanticOutputParser(
-            pydantic_object=SessionAnalysisForLLM
+            # Truncate from the middle to keep both beginning and end context
+            half_chars = max_chars // 2
+            return (
+                text[:half_chars]
+                + f"\n\n[... TRUNCATED {len(text) - max_chars} characters ...]\n\n"
+                + text[-half_chars:]
+            )
+
+        full_session_context = truncate_text_to_tokens(
+            "\n".join(all_messages), max_tokens=100000
+        )
+        key_user_messages = truncate_text_to_tokens(
+            "\n".join(important_user_messages), max_tokens=30000
         )
 
         prompt = PROMPTS["session_analysis"].format(
@@ -81,7 +95,6 @@ class ToMAnalyzer:
             session_id=session_id,
             total_messages=len(session_data["messages"]),
             important_user_messages=len(important_user_messages),
-            format_instructions=parser.get_format_instructions(),
         )
         result = await self.llm_client.call_structured_async(
             prompt=prompt,
@@ -104,28 +117,24 @@ class ToMAnalyzer:
         """Initialize UserAnalysis from latest 50 session summaries using LLM."""
         # Take only the latest 50 sessions
         recent_sessions = (
-            session_summaries[-50:]
-            if len(session_summaries) > 50
+            session_summaries[-30:]
+            if len(session_summaries) > 30
             else session_summaries
         )
         # Create prompt with session data
         sessions_text = [s.model_dump() for s in recent_sessions]
 
-        parser: PydanticOutputParser[UserAnalysisForLLM] = PydanticOutputParser(
-            pydantic_object=UserAnalysisForLLM
-        )
-
         prompt = PROMPTS["user_analysis"].format(
             user_id=self.user_id,
             num_sessions=len(recent_sessions),
             sessions_text=sessions_text,
-            format_instructions=parser.get_format_instructions(),
         )
 
         result = await self.llm_client.call_structured_async(
             prompt=prompt,
             output_type=UserAnalysisForLLM,
         )
+        breakpoint()
 
         return UserAnalysis(
             user_profile=result.user_profile

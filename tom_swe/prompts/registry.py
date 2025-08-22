@@ -63,9 +63,7 @@ The actions you could use are (IMPORTANT: you can only use these actions, there 
 ## Session Metadata:
 - Session ID: {session_id}
 - Total messages: {total_messages}
-- Important user messages: {important_user_messages}
-
-{format_instructions}""",
+- Important user messages: {important_user_messages}""",
     "user_analysis": """Analyze these recent coding sessions to create a comprehensive user profile.
 
 User ID: {user_id}
@@ -74,9 +72,7 @@ Recent Sessions ({num_sessions} sessions):
 
 Create a user analysis including:
 1. User profile with overall description, intent/emotion distributions, preferences
-2. Keep the session summaries as provided
-
-{format_instructions}""",
+2. Keep the session summaries as provided""",
     "message_condensation": """Please condense the following message to max {max_tokens} tokens (do not exceed the limit, and do not add any extra information).
 FOCUS: Keep the most important information that provides context for understanding a conversation.
 
