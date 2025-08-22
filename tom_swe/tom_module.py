@@ -134,7 +134,6 @@ class ToMAnalyzer:
             prompt=prompt,
             output_type=UserAnalysisForLLM,
         )
-        breakpoint()
 
         return UserAnalysis(
             user_profile=result.user_profile

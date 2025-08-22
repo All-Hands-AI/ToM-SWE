@@ -33,7 +33,6 @@ def test_sleeptime():
         session_data = json.load(open(f"./data/example_sessions/{file}"))
         sessions_data.append(session_data)
 
-    breakpoint()
     agent = ToMAgent()
     agent.sleeptime_compute(sessions_data)
 
