@@ -178,6 +178,7 @@ class SessionAnalysis(BaseModel):
     per_message_analysis: List[UserMessageAnalysis]
     session_start: str = ""
     session_end: str = ""
+    session_tldr: str = ""
     last_updated: str
 
 
@@ -190,6 +191,9 @@ class SessionAnalysisForLLM(BaseModel):
             "The primary intent of the session. Choose from: debugging, code_generation, "
             "code_explanation, optimization, learning, configuration, testing, file_management, general."
         )
+    )
+    session_tldr: str = Field(
+        description="A short summary of the session, 1-2 sentences. It's recommended to include some specific details to make it more useful for the SWE agent."
     )
     per_message_analysis: List[UserMessageAnalysis] = Field(default_factory=list)
 
@@ -209,11 +213,6 @@ class UserProfile(BaseModel):
     preference_summary: List[str] = Field(
         description="Summarized list of user preferences extracted from all sessions. It's recommended to include some specific details to make it more useful for the SWE agent."
     )
-
-
-class UserAnalysisForLLM(BaseModel):
-    user_profile: UserProfile
-    session_summaries: List[SessionSummary]
 
 
 class UserAnalysis(BaseModel):

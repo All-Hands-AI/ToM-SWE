@@ -11,8 +11,10 @@ from tom_swe.generation.dataclass import (
     SessionAnalysis,
     UserProfile,
     SessionAnalysisForLLM,
-    UserAnalysisForLLM,
+    SessionSummary,
 )
+from tom_swe.memory.locations import get_overall_user_model_filename
+from tom_swe.memory.local import LocalFileStore
 from tom_swe.prompts import PROMPTS
 
 
@@ -101,48 +103,94 @@ class ToMAnalyzer:
             output_type=SessionAnalysisForLLM,
         )
 
-        return SessionAnalysis(
+        session_analysis = SessionAnalysis(
             session_id=session_id,
             user_modeling_summary=result.user_modeling_summary,
             intent=result.intent,
             per_message_analysis=result.per_message_analysis,
             session_start=session_data.get("start_time") or "",
             session_end=session_data.get("end_time") or "",
+            session_tldr=result.session_tldr,
             last_updated=datetime.now().isoformat(),
         )
+
+        # Auto-update overall_user_model if it exists
+        file_store = LocalFileStore("usermodeling")
+        user_model_path = get_overall_user_model_filename(self.user_id)
+        if file_store.exists(user_model_path):
+            await self._auto_update_user_model(session_analysis)
+
+        return session_analysis
+
+    async def _auto_update_user_model(self, session_analysis: SessionAnalysis) -> None:
+        """Auto-update the overall user model with new session information."""
+        try:
+            import json
+
+            # Use LocalFileStore for file operations
+            file_store = LocalFileStore("usermodeling")
+            user_model_path = get_overall_user_model_filename(self.user_id)
+
+            # Load existing user model (we know it exists from the condition)
+            user_model_content = file_store.read(user_model_path)
+            user_model = json.loads(user_model_content)
+
+            # Add new session summary to the model
+            new_session_summary = {
+                "session_id": session_analysis.session_id,
+                "session_tldr": session_analysis.session_tldr,
+            }
+
+            # Update session summaries (keep latest 50)
+            user_model["session_summaries"] = user_model.get("session_summaries", [])
+            user_model["session_summaries"].append(new_session_summary)
+            if len(user_model["session_summaries"]) > 50:
+                user_model["session_summaries"] = user_model["session_summaries"][-50:]
+
+            # Update timestamp
+            user_model["last_updated"] = datetime.now().isoformat()
+
+            # Save updated model
+            updated_content = json.dumps(user_model, indent=2)
+            file_store.write(user_model_path, updated_content)
+
+        except Exception as e:
+            # Log error but don't fail the session analysis
+            print(f"Warning: Failed to auto-update user model: {e}")
 
     async def initialize_user_analysis(
         self, session_summaries: List[SessionAnalysis]
     ) -> UserAnalysis:
         """Initialize UserAnalysis from latest 50 session summaries using LLM."""
         # Take only the latest 50 sessions
-        recent_sessions = (
-            session_summaries[-30:]
-            if len(session_summaries) > 30
-            else session_summaries
-        )
         # Create prompt with session data
-        sessions_text = [s.model_dump() for s in recent_sessions]
+        sessions_text = [s.model_dump() for s in session_summaries]
 
         prompt = PROMPTS["user_analysis"].format(
             user_id=self.user_id,
-            num_sessions=len(recent_sessions),
+            num_sessions=len(session_summaries),
             sessions_text=sessions_text,
         )
 
         result = await self.llm_client.call_structured_async(
             prompt=prompt,
-            output_type=UserAnalysisForLLM,
+            output_type=UserProfile,
         )
 
         return UserAnalysis(
-            user_profile=result.user_profile
+            user_profile=result
             or UserProfile(
                 user_id=self.user_id,
                 overall_description=["User analysis unavailable"],
                 preference_summary=[],
             ),
-            session_summaries=result.session_summaries or [],
+            session_summaries=[
+                SessionSummary(
+                    session_id=s.session_id,
+                    session_tldr=s.session_tldr,
+                )
+                for s in session_summaries
+            ],
             last_updated=datetime.now().isoformat(),
         )
 
