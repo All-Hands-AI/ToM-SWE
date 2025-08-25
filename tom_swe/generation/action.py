@@ -301,7 +301,7 @@ class ActionExecutor:
             data["last_updated"] = datetime.now().isoformat()
             self.file_store.write(field_path, json.dumps(data, indent=2))
 
-            return f"Updated {field_path}: {params.operation} {params.new_value}"
+            return f"Updated {field_path}: {params.list_operation} {params.new_value}"
 
         except Exception as e:
             return f"Update error: {str(e)}"
