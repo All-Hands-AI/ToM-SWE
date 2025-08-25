@@ -17,6 +17,19 @@ from tom_swe.memory.locations import get_overall_user_model_filename
 from tom_swe.memory.local import LocalFileStore
 from tom_swe.prompts import PROMPTS
 
+# Get logger that properly integrates with parent applications like OpenHands
+try:
+    from tom_swe.logging_config import get_tom_swe_logger, CLI_DISPLAY_LEVEL
+
+    logger = get_tom_swe_logger(__name__)
+except ImportError:
+    # Fallback for standalone use
+    import logging
+
+    logger = logging.getLogger(__name__)
+    CLI_DISPLAY_LEVEL = 25
+    logging.addLevelName(CLI_DISPLAY_LEVEL, "CLI_DISPLAY")
+
 
 class ToMAnalyzer:
     def __init__(
@@ -36,8 +49,14 @@ class ToMAnalyzer:
         Uses important user messages as focus points with full session context.
         """
         session_id = session_data.get("session_id", "unknown")
+        logger.log(
+            CLI_DISPLAY_LEVEL, f"🔍 Tom: Starting session analysis for {session_id}"
+        )
 
         if not session_data or "messages" not in session_data:
+            logger.log(
+                CLI_DISPLAY_LEVEL, f"⚠️ Tom: No session data available for {session_id}"
+            )
             return SessionAnalysis(
                 session_id=session_id,
                 intent="",
@@ -52,6 +71,11 @@ class ToMAnalyzer:
         important_user_messages = []
         all_messages = []
 
+        logger.log(
+            CLI_DISPLAY_LEVEL,
+            f'📊 Tom: Processing {len(session_data["messages"])} messages',
+        )
+
         for message in session_data["messages"]:
             # Build full session context (all messages)
             role = message.get("source", "unknown")
@@ -64,9 +88,18 @@ class ToMAnalyzer:
 
         # If no important messages marked, use all user messages
         if not important_user_messages:
+            logger.log(
+                CLI_DISPLAY_LEVEL,
+                "🔄 Tom: No important messages marked, using all user messages",
+            )
             for message in session_data["messages"]:
                 if message.get("source") == "user":
                     important_user_messages.append(message.get("content", ""))
+
+        logger.log(
+            CLI_DISPLAY_LEVEL,
+            f"📝 Tom: Found {len(important_user_messages)} important user messages",
+        )
 
         # Create comprehensive session context with truncation to fit context window
         def truncate_text_to_tokens(text: str, max_tokens: int = 50000) -> str:
@@ -91,6 +124,12 @@ class ToMAnalyzer:
             "\n".join(important_user_messages), max_tokens=30000
         )
 
+        logger.log(CLI_DISPLAY_LEVEL, "🤖 Tom: Sending session to LLM for analysis")
+        logger.log(
+            CLI_DISPLAY_LEVEL,
+            f"📏 Tom: Full context: {len(full_session_context)} chars, Key messages: {len(key_user_messages)} chars",
+        )
+
         prompt = PROMPTS["session_analysis"].format(
             full_session_context=full_session_context,
             key_user_messages=key_user_messages,
@@ -98,10 +137,13 @@ class ToMAnalyzer:
             total_messages=len(session_data["messages"]),
             important_user_messages=len(important_user_messages),
         )
+
+        logger.log(CLI_DISPLAY_LEVEL, "🔄 Tom: Calling LLM for structured analysis...")
         result = await self.llm_client.call_structured_async(
             prompt=prompt,
             output_type=SessionAnalysisForLLM,
         )
+        logger.log(CLI_DISPLAY_LEVEL, "✅ Tom: LLM analysis completed")
 
         session_analysis = SessionAnalysis(
             session_id=session_id,
@@ -114,11 +156,24 @@ class ToMAnalyzer:
             last_updated=datetime.now().isoformat(),
         )
 
+        logger.log(
+            CLI_DISPLAY_LEVEL,
+            f"📋 Tom: Session analysis complete - Intent: {result.intent[:100]}...",
+        )
+        logger.log(
+            CLI_DISPLAY_LEVEL,
+            f"👤 Tom: User modeling summary: {result.user_modeling_summary[:100]}...",
+        )
+
         # Auto-update overall_user_model if it exists
         file_store = LocalFileStore("usermodeling")
         user_model_path = get_overall_user_model_filename(self.user_id)
         if file_store.exists(user_model_path):
+            logger.log(CLI_DISPLAY_LEVEL, "🔄 Tom: Auto-updating overall user model")
             await self._auto_update_user_model(session_analysis)
+            logger.log(CLI_DISPLAY_LEVEL, "✅ Tom: User model updated")
+        else:
+            logger.log(CLI_DISPLAY_LEVEL, "📭 Tom: No existing user model to update")
 
         return session_analysis
 
