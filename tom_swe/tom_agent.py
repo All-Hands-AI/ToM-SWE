@@ -30,7 +30,6 @@ from dotenv import load_dotenv
 # Local imports
 from tom_swe.generation.dataclass import (
     InstructionImprovement,
-    ClarityAssessment,
     AnalyzeSessionParams,
     InitializeUserProfileParams,
 )
@@ -154,6 +153,7 @@ class ToMAgent:
     def propose_instructions(
         self,
         user_id: str | None = "",
+        original_instruction: str = "",
         formatted_messages: List[Dict[str, Any]] | None = None,
     ) -> InstructionImprovement | None:
         """
@@ -166,6 +166,11 @@ class ToMAgent:
         Returns:
             Instruction recommendation
         """
+        # return InstructionImprovement(
+        #     original_instruction=original_instruction,
+        #     improved_instruction="test tom improve instruction",
+        #     confidence_score=0.9,
+        # )
         logger.info(f"🎯 Proposing instructions for user {user_id}")
         if user_id is None:
             user_id = ""
@@ -194,52 +199,28 @@ class ToMAgent:
             + [
                 {
                     "role": "user",
-                    "content": f"Here is the content of the overall_user_model (`overall_user_model.json`): {user_model}",
+                    "content": f"Here is the content of the overall_user_model (`overall_user_model.json`): {user_model}\n Below is the agent-user interaction context:\n-------------context start-------------",
                 }
             ]
             + formatted_messages
+            + [
+                {
+                    "role": "user",
+                    "content": f"-------------context end-------------\n Here is the my instruction for improvement: {original_instruction}\n Now I want you to role-play as me and improve the instruction.",
+                }
+            ]
         )
         assert (
             propose_instructions_messages[-1]["role"] == "user"
         ), "Last message must be a user message"
 
-        # Extract original instruction text from all consecutive user messages from the end
-        def extract_text_from_content(content: str | list[dict[str, Any]]) -> str:
-            """Extract text from message content (handles both string and structured content)."""
-            if isinstance(content, list):
-                # Handle structured content (text/image)
-                text_parts = [
-                    c.get("text", "") for c in content if c.get("type") == "text"
-                ]
-                return " ".join(text_parts)
-            else:
-                # Handle simple string content
-                return str(content)
-
-        # Collect all consecutive user messages from the end
-        propose_instructions_messages.append(
-            {
-                "role": "user",
-                "content": f"Here is the my original instruction: {formatted_messages[-1]['content']}\n Now I want you to role-play as me and improve the instruction.",
-            }
-        )
-        user_messages: list[str] = []
-        for i in range(len(propose_instructions_messages) - 1, -1, -1):
-            message = propose_instructions_messages[i]
-            if message["role"] == "user":
-                text = extract_text_from_content(message["content"])
-                user_messages.insert(0, text)  # Insert at beginning to maintain order
-            else:
-                break  # Stop when we hit a non-user message
-
-        original_instruction = " ".join(user_messages)
         try:
-            clarity_result = self.llm_client.call_structured_messages(
-                messages=propose_instructions_messages,
-                output_type=ClarityAssessment,
-                temperature=0.1,
-            )
-
+            # clarity_result = self.llm_client.call_structured_messages(
+            #     messages=propose_instructions_messages,
+            #     output_type=ClarityAssessment,
+            #     temperature=0.1,
+            # )
+            clarity_result = None
             # Early stop if clarity is sufficient
             if clarity_result and clarity_result.is_clear:
                 logger.info(
@@ -248,16 +229,12 @@ class ToMAgent:
                 # Return minimal improvement for clear instructions
                 return None
             else:
-                logger.info(
-                    f"🔄 Proceeding with full workflow - {clarity_result.reasoning if clarity_result else 'unknown'}"
-                )
-                # Use workflow controller with final structured output
-                propose_instructions_messages.append(
-                    {
-                        "role": "assistant",
-                        "content": f"Clarity assessment: {clarity_result.reasoning} (The instruction is clear: {clarity_result.is_clear})",
-                    }
-                )
+                # propose_instructions_messages.append(
+                #     {
+                #         "role": "assistant",
+                #         "content": f"Clarity assessment: {clarity_result.reasoning} (The instruction is clear: {clarity_result.is_clear})",
+                #     }
+                # )
                 result = self._step(
                     messages=propose_instructions_messages,
                 )
@@ -559,7 +536,7 @@ def create_tom_agent(
     llm_model: Optional[str] = None,
     api_key: Optional[str] = None,
     api_base: Optional[str] = None,
-    enable_rag: bool = True,
+    enable_rag: bool = False,
     file_store: Optional[FileStore] = None,
     skip_memory_collection: bool = False,
 ) -> ToMAgent:

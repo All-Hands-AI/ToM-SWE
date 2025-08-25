@@ -109,8 +109,8 @@ def main():
 
 if __name__ == "__main__":
     # Test the sleeptime function first
-    test_sleeptime()
+    # test_sleeptime()
     # print("\n" + "=" * 50 + "\n")
 
     # Then run the main ToM agent demo
-    # main()
+    main()

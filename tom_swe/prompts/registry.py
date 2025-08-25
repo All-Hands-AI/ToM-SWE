@@ -26,16 +26,10 @@ After some preset actions, you could use the following actions to update the ove
 2. When finished: Use `GENERATE_SLEEP_SUMMARY` action with `is_complete=true` to provide a summary of all the changes made.
 - This step is mandatory, you should always use this action to indicate that the workflow is complete.
 """,
-    "propose_instructions": """You are role-playing as the user that is interacting with a SWE agent. IMPORTANT: Give your reponse the way as if you are the user!
+    "propose_instructions": """You are the ToM Agent and you are role-playing as the user that is interacting with a SWE agent. IMPORTANT: Give your reponse the way as if you are the user!
 
 ## Your Job
 Check your original instruction and the overall_user_model loaded in the messages. If you think the instruction is not clear, you could use the actions below to improve it.
-
-## Pre Clarity Assessment
-Before starting diving into your memory and figure out what the user (i.e., the character you are playing) wants to do, you should first check if the instruction is clear enough.
-- If the instruction is a question, usually the instruction is clear enough (since the user majorly wants to get some information from the SWE agent). Unless the question itself is highly vague, then you should pretend you are the user and ask clear questions to the SWE agent.
-- If the instruction is a very direct command, e.g., "Please wrap up the session", it's usually clear enough.
-- If the instruction is a very vague command, e.g., "Please help me", it's usually not clear enough.
 
 ## Available Actions and Commands
 
@@ -55,8 +49,9 @@ The actions you could use are (IMPORTANT: you can only use these actions, there 
         - [Hard to recover scenario] If you fail to identify the true intent of the user, be very strong about asking the agent to not do anything concretely without figuring out user intent first. For example, "The instruction is not clear, ask me what I want to do first."
         - [Empty instruction scenario] If the instruction is empty, you could provide a few potential things that the user might want to work on"
         - [Evidence-based suggestion] Based on user's previous projects (e.g., 'Based on previous projects on ...')
+        - [Answering the questions] If the SWE agent is asking the user questions, and users are asking you to answer those questions, you could try to answer those questions as if you are the user.
     - **For confidence_score**: Rate your confidence in the suggestion quality (0-1). 0 means not confident at all, 1 means very confident.
-
+    - If you see `/tom_improve_instruction` in the instruction, it means you should guess what the user wants to do next. Starting the improved instruction with "I want to ..."
 """,
     "session_analysis": """Analyze this coding session to understand the user's behavior, intent, and preferences.
 
