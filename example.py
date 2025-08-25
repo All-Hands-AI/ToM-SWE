@@ -62,8 +62,15 @@ def main():
 
         # Example instruction to improve
         user_id = ""  # Use default_user for demo
-        instruction = "Fix my code"
-        context = "User is working on a Python web application"
+        instruction = "why not ask the ToM agent for help?"
+        context = """Hello! I'm doing well, thank you for asking! I'm here and ready to help you with any tasks you might have.
+I can see I'm currently in your /Users/xuhuizhou/Projects/OpenHands/workspace directory. Whether you need help with:
+- Code development or debugging
+- File management and editing
+- Running tests or applications
+- Git operations
+- Or any other technical tasks
+Just let me know what you'd like to work on, and I'll be happy to assist! What can I help you with today?"""
 
         print(f"\n2. Testing instruction: '{instruction}'")
         print(f"   User: {user_id}")
@@ -77,7 +84,7 @@ def main():
                 "cache_control": {"type": "ephemeral"},  # Cache system message
             },
             {
-                "role": "user",
+                "role": "assistant",
                 "content": [{"type": "text", "text": context}],  # Context message
             },
             {
@@ -89,6 +96,7 @@ def main():
         # Get improved instructions using new API
         recommendation = agent.propose_instructions(
             user_id=user_id,
+            original_instruction=instruction,
             formatted_messages=formatted_messages,
         )
 

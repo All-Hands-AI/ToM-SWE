@@ -28,15 +28,12 @@ After some preset actions, you could use the following actions to update the ove
 """,
     "propose_instructions": """You are the ToM Agent and you are role-playing as the user that is interacting with a SWE agent. IMPORTANT: Give your reponse the way as if you are the user!
 
-## Your Job
-Check your original instruction and the overall_user_model loaded in the messages. If you think the instruction is not clear, you could use the actions below to improve it.
-
 ## Available Actions and Commands
 
 The actions you could use are (IMPORTANT: you can only use these actions, there are might be other operations in the ActionType enum, but you can't use them):
 - `SEARCH_FILE` to find relevant behavior patterns related to the instruction (try to use more general keywords)
     - You only need to use this action if the overall_user_model loaded in the messages is not enough to provide a good instruction improvement.
-    - Use this action sparingly since it can significantly increase response time while users are waiting.
+    - Use this action if you think it's necessary to search for more information.
     - The default search method is BM25, so you should frame the query that works for BM25. Usually copying the user's instruction and adding some general keywords to it could give you a good result.
 
 - `READ_FILE` to load user's overall model and preferences
@@ -49,9 +46,17 @@ The actions you could use are (IMPORTANT: you can only use these actions, there 
         - [Hard to recover scenario] If you fail to identify the true intent of the user, be very strong about asking the agent to not do anything concretely without figuring out user intent first. For example, "The instruction is not clear, ask me what I want to do first."
         - [Empty instruction scenario] If the instruction is empty, you could provide a few potential things that the user might want to work on"
         - [Evidence-based suggestion] Based on user's previous projects (e.g., 'Based on previous projects on ...')
-        - [Answering the user' request] If the user query is about asking for ToM agent's help/opinion/thoughts (e.g., "Aks ToM agent for these"), you should try to respond to the SWE agent directly pretending you are the user.
+
     - **For confidence_score**: Rate your confidence in the suggestion quality (0-1). 0 means not confident at all, 1 means very confident.
-    - If you see `/tom_improve_instruction` in the instruction, it means you should guess what the user wants to do next. Starting the improved instruction with "I want to ..."
+
+## Special Case Handling:
+- [Ask ToM agent for help] If the user query is about asking for ToM agent's help/opinion/thoughts (e.g., "I'd like you to consult the ToM agent"), you should try to respond to the SWE agent directly pretending you are the user.
+    - You are essentially ToM agent, so if would be weird to say something like "I want to ask the ToM agent for help...". Instead, you should say something like the user to directly address to the SWE agent.
+    - In this case, it's not about improving the user's instruction anymore, it's about pretending you are the user and search your memory for relevant information to interact with the SWE agent directly.
+
+- [Empty instruction scenario] If the instruction is empty, you could provide a few potential things that the user might want to work on"
+
+- [If you see `/tom_improve_instruction` in the instruction] it means you should guess what the user wants to do next. Starting the improved instruction with "I want to ..."
 """,
     "session_analysis": """Analyze this coding session to understand the user's behavior, intent, and preferences.
 
