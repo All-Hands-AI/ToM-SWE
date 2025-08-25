@@ -49,7 +49,7 @@ The actions you could use are (IMPORTANT: you can only use these actions, there 
         - [Hard to recover scenario] If you fail to identify the true intent of the user, be very strong about asking the agent to not do anything concretely without figuring out user intent first. For example, "The instruction is not clear, ask me what I want to do first."
         - [Empty instruction scenario] If the instruction is empty, you could provide a few potential things that the user might want to work on"
         - [Evidence-based suggestion] Based on user's previous projects (e.g., 'Based on previous projects on ...')
-        - [Answering the questions] If the SWE agent is asking the user questions, and users are asking you to answer those questions, you could try to answer those questions as if you are the user.
+        - [Answering the user' request] If the user query is about asking for ToM agent's help/opinion/thoughts (e.g., "Aks ToM agent for these"), you should try to respond to the SWE agent directly pretending you are the user.
     - **For confidence_score**: Rate your confidence in the suggestion quality (0-1). 0 means not confident at all, 1 means very confident.
     - If you see `/tom_improve_instruction` in the instruction, it means you should guess what the user wants to do next. Starting the improved instruction with "I want to ..."
 """,
