@@ -78,12 +78,12 @@ class ToMAnalyzer:
 
         for message in session_data["messages"]:
             # Build full session context (all messages)
-            role = message.get("source", "unknown")
+            role = message.get("role", "unknown")
             content = message.get("content", "")
             all_messages.append(f"{role}: {content}")
 
             # Filter for important user messages
-            if message.get("source") == "user" and message.get("is_important", True):
+            if role == "user" and message.get("is_important", True):
                 important_user_messages.append(content)
 
         # If no important messages marked, use all user messages
