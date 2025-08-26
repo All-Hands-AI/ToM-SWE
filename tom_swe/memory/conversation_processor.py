@@ -58,7 +58,7 @@ def _is_important_user_message(original: str, cleaned: str) -> bool:
     if not cleaned.strip():
         return False
 
-    if len(cleaned) < 25:  # Too short
+    if len(cleaned) < 10:  # Too short
         return False
 
     if len(cleaned) < len(original) * 0.3:  # Mostly system content
