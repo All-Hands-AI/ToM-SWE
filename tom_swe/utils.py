@@ -118,13 +118,12 @@ def format_proposed_instruction(
     confidence_score: float,
 ) -> str:
     final_instruction = f"""The user's original message was: '{original_instruction}'
+Based on the conversation context and user patterns, here's a suggestion to help swe agent better understand and help the user:
 *****************ToM Agent Analysis Start Here*****************
-Based on the conversation context and user patterns, here's a suggestion to help you better understand and help the user:
-
-## Improved Instruction (IMPORTANT!)
+**Improved Instruction (IMPORTANT!)**
 {improved_instruction}
 
-## Confidence in the improved instruction
+**Confidence in the improved instruction**
 The ToM agent is {confidence_score*100:.0f}% confident in the improved instruction.
 """
 
