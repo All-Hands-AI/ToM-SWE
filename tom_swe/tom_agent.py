@@ -459,29 +459,33 @@ class ToMAgent:
             ]
             # remove empty strings
             cleaned_session_ids = [x for x in cleaned_session_ids if x]
-
-            # rank the cleaned_session_ids; the last id is the most recent session
-            def get_last_updated(session_id: str) -> str:
-                session_data = json.loads(
-                    self.file_store.read(
-                        get_cleaned_session_filename(session_id, user_id)
-                    )
-                )
-                return str(session_data.get("last_updated", ""))
-
-            cleaned_session_ids = sorted(cleaned_session_ids, key=get_last_updated)
         except FileNotFoundError:
             # No cleaned sessions directory exists yet
             cleaned_session_ids = []
             return
-        # Find sessions that don't have corresponding model files
-        unprocessed_sessions = [
-            cleaned_session_ids[-1]
-        ]  # always process the most recent session as we don't know whether such session is updated.
-        for session_id in cleaned_session_ids[:-1]:
+        # Find sessions that need reprocessing based on timestamp comparison
+        unprocessed_sessions = []
+        for session_id in cleaned_session_ids:
             model_file = get_session_model_filename(session_id, user_id)
+
+            # Get cleaned session timestamp
+            cleaned_session_data = json.loads(
+                self.file_store.read(get_cleaned_session_filename(session_id, user_id))
+            )
+            cleaned_last_updated = cleaned_session_data.get("last_updated", "")
+
             if not self.file_store.exists(model_file):
+                # No model file exists - needs processing
                 unprocessed_sessions.append(session_id)
+            else:
+                # Model file exists - check if cleaned session is newer
+                model_data = json.loads(self.file_store.read(model_file))
+                model_last_updated = model_data.get("last_updated", "")
+
+                if cleaned_last_updated > model_last_updated:
+                    # Cleaned session is newer - needs reprocessing
+                    unprocessed_sessions.append(session_id)
+
         logger.info(f"🔍 Unprocessed sessions: {unprocessed_sessions}")
 
         preset_actions = []
