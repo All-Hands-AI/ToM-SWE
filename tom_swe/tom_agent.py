@@ -218,7 +218,6 @@ class ToMAgent:
             # clarity_result = self.llm_client.call_structured_messages(
             #     messages=propose_instructions_messages,
             #     output_type=ClarityAssessment,
-            #     temperature=0.1,
             # )
             clarity_result = None
             # Early stop if clarity is sufficient
@@ -375,7 +374,7 @@ class ToMAgent:
             else:
                 # Structured call with Pydantic model for intermediate steps
                 response = self.llm_client.call_structured_messages(
-                    messages=messages, output_type=response_model, temperature=0.1
+                    messages=messages, output_type=response_model
                 )
 
             if not response:

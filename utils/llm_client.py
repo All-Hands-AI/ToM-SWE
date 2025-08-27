@@ -22,7 +22,6 @@ class LLMClient:
         self.config = config or {}
         self.provider = self.config.get("provider", "openai")
         self.model = self.config.get("model", "gpt-4")
-        self.temperature = self.config.get("temperature", 0.2)
         self.max_tokens = self.config.get("max_tokens", 1000)
 
         # Set up API keys
@@ -100,7 +99,6 @@ class LLMClient:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=self.temperature,
                 max_tokens=self.max_tokens,
             )
             content = response.choices[0].message.content

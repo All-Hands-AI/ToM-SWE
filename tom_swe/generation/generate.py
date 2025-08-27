@@ -25,8 +25,6 @@ T = TypeVar("T", bound=BaseModel)
 
 # Default LLM configuration
 DEFAULT_MODEL = "litellm_proxy/claude-sonnet-4-20250514"
-DEFAULT_TEMPERATURE = 0.3
-DEFAULT_MAX_TOKENS = 1024
 
 # Fallback model for fixing bad outputs
 DEFAULT_BAD_OUTPUT_PROCESS_MODEL = "gpt-4o-mini"
@@ -37,8 +35,6 @@ class LLMConfig:
     """Configuration for LLM calls."""
 
     model: str = DEFAULT_MODEL
-    temperature: float = DEFAULT_TEMPERATURE
-    max_tokens: int = DEFAULT_MAX_TOKENS
     api_key: Optional[str] = None
     api_base: Optional[str] = None
     fallback_model: str = DEFAULT_BAD_OUTPUT_PROCESS_MODEL
@@ -114,7 +110,6 @@ class LLMClient:
         self,
         prompt: str,
         output_type: Type[T],
-        temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
     ) -> T:
         """
@@ -123,7 +118,6 @@ class LLMClient:
         Args:
             prompt: The main prompt for the LLM
             output_type: Pydantic model class for the expected output
-            temperature: Override default temperature for this call
             max_tokens: Override default max_tokens for this call
 
         Returns:
@@ -142,8 +136,6 @@ class LLMClient:
         completion_args = {
             "model": self.config.model,
             "messages": [{"role": "user", "content": full_prompt}],
-            "temperature": temperature or self.config.temperature,
-            "max_tokens": max_tokens or self.config.max_tokens,
             "response_format": output_type,
         }
 
@@ -194,7 +186,6 @@ class LLMClient:
         self,
         messages: List[Dict[str, Any]],
         output_type: Type[T],
-        temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
     ) -> T:
         """
@@ -203,7 +194,6 @@ class LLMClient:
         Args:
             messages: List of message dicts (supports cache_control if present)
             output_type: Pydantic model class for the expected output
-            temperature: Override default temperature for this call
             max_tokens: Override default max_tokens for this call
 
         Returns:
@@ -222,8 +212,6 @@ class LLMClient:
         completion_args = {
             "model": self.config.model,
             "messages": full_messages,
-            "temperature": temperature or self.config.temperature,
-            "max_tokens": max_tokens or self.config.max_tokens,
             "response_format": output_type,
         }
 
@@ -301,8 +289,6 @@ class LLMClient:
 # Backward compatibility and convenience functions
 def create_llm_client(
     model: str = DEFAULT_MODEL,
-    temperature: float = DEFAULT_TEMPERATURE,
-    max_tokens: int = DEFAULT_MAX_TOKENS,
     api_key: Optional[str] = None,
     api_base: Optional[str] = None,
     fallback_model: str = DEFAULT_BAD_OUTPUT_PROCESS_MODEL,
@@ -312,7 +298,6 @@ def create_llm_client(
 
     Args:
         model: LLM model to use
-        temperature: Default temperature for generation
         max_tokens: Default max tokens for generation
         api_key: API key for LLM service
         api_base: Base URL for LLM service
@@ -323,8 +308,6 @@ def create_llm_client(
     """
     config = LLMConfig(
         model=model,
-        temperature=temperature,
-        max_tokens=max_tokens,
         api_key=api_key,
         api_base=api_base,
         fallback_model=fallback_model,

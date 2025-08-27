@@ -738,7 +738,6 @@ class VectorDB:
             response = completion(
                 model="gpt-4o-mini",  # Fast and cost-effective
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.1,  # Low temperature for consistent condensation
                 max_tokens=max_tokens + 50,  # Buffer for response formatting
             )
 
