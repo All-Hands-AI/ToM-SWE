@@ -6,7 +6,7 @@ This module contains all Pydantic BaseModel classes used for data validation
 and serialization in the ToM module.
 """
 
-from typing import Any, List, Union
+from typing import List, Union
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -73,7 +73,7 @@ class UpdateJsonFieldParams(BaseModel):
     field_path: str = Field(
         description="Dot notation path to the field (e.g., 'user.preferences.theme')"
     )
-    new_value: Any = Field(description="New value to set for the field")
+    new_value: str = Field(description="New value to set for the field")
     list_operation: str = Field(
         default="append",
         description="List operation: 'append' or 'remove' (by value or index)",
