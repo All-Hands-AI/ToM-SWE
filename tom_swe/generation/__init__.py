@@ -10,7 +10,6 @@ This module provides improved LLM calling mechanisms with:
 from .generate import (
     LLMClient,
     LLMConfig,
-    create_llm_client,
 )
 from .output_parsers import PydanticOutputParser
 
@@ -22,7 +21,6 @@ __all__ = [
     "PydanticOutputParser",
     "LLMClient",
     "LLMConfig",
-    "create_llm_client",
     "ActionType",
     "ActionResponse",
     "ActionExecutor",

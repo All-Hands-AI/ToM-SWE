@@ -284,32 +284,3 @@ class LLMClient:
                 raise ValueError(
                     f"Failed to parse output even after reformatting. Original error: {parse_error}, Fallback error: {fallback_error}"
                 ) from parse_error
-
-
-# Backward compatibility and convenience functions
-def create_llm_client(
-    model: str = DEFAULT_MODEL,
-    api_key: Optional[str] = None,
-    api_base: Optional[str] = None,
-    fallback_model: str = DEFAULT_BAD_OUTPUT_PROCESS_MODEL,
-) -> LLMClient:
-    """
-    Create an LLM client with the given configuration.
-
-    Args:
-        model: LLM model to use
-        max_tokens: Default max tokens for generation
-        api_key: API key for LLM service
-        api_base: Base URL for LLM service
-        fallback_model: Model to use for reformatting bad outputs
-
-    Returns:
-        Configured LLMClient instance
-    """
-    config = LLMConfig(
-        model=model,
-        api_key=api_key,
-        api_base=api_base,
-        fallback_model=fallback_model,
-    )
-    return LLMClient(config)
