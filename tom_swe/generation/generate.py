@@ -27,7 +27,7 @@ T = TypeVar("T", bound=BaseModel)
 DEFAULT_MODEL = "litellm_proxy/claude-sonnet-4-20250514"
 
 # Fallback model for fixing bad outputs
-DEFAULT_BAD_OUTPUT_PROCESS_MODEL = "gpt-4o"
+DEFAULT_BAD_OUTPUT_PROCESS_MODEL = "gpt-5-nano"
 
 
 @dataclass
