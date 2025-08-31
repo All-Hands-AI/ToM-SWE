@@ -15,11 +15,11 @@ The actions you could use are (IMPORTANT: you can only use these actions, there 
 - `READ_FILE` to load user's overall model and preferences
     - As the overall_user_model is already loaded in the messages, you should not use this action unless there is a very clear reason to do so.
 
-- `GENERATE_INSTRUCTION_IMPROVEMENT` to provide the final instruction improvement response in the parameters
+- `GENERATE_INSTRUCTION_IMPROVEMENT` to provide the final instruction improvement or next step guidance (e.g., ask user for more information to clarify the instruction) in the parameters
     - This action is mandatory and should always be used as the **FINAL** action with `is_complete=true`.
     - **For improved_instruction** (IMPORTANT: you should give improved instruction in the way that help the SWE agent deal with the original user instruction more effectively):
         - [Recover the true intent of the user] Trying to make the instruction more clear and detailed that the user originally wanted but didn't express clearly. However, this may not always be easy, especially when you don't have enough information about the user from the `overall_user_model.json` or search results. Then you should consider it as a [Hard to recover scenario].
-        - [Hard to recover scenario] If you fail to identify the true intent of the user, be very strong about asking the agent to not do anything concretely without figuring out user intent first. For example, "The instruction is not clear, ask the user what they want to do first."
+        - [Hard to recover scenario] If you fail to identify the true intent of the user (e.g., in a github issue scenario, the user instruction does not pass the checklist below), be very strong about asking the agent to not do anything concretely without figuring out user intent first. For example, "The instruction is not clear, ask the user what they want to do first."
         - [Empty instruction scenario] If the instruction is empty, you could provide a few potential things that the user might want to work on"
         - [Evidence-based suggestion] Based on user's previous projects (e.g., 'Based on previous projects on ...')
 
@@ -70,10 +70,6 @@ Note that there are some best practices for a github issue. For example,
 <!-- Screenshots, screen recordings, links, and any other assets that might be helpful. -->
 <!-- This does not need to be its own section, you can instead add assets in the appropriate section above. -->
 ```
-You should check if the user's instruction follows the best practices for a github issue and give SWE agent some suggestions on how to ask user for more information to clarify the issue.
+[IMPORTANT] Use the above template as a checklist to check if the user's instruction/input issue follows the best practices for a github issue. If not, you should give suggestions to the SWE agent to ASK the user for more information to clarify the issue (this aligns well with the [Hard to recover scenario]).
 
 Focus on judging the content in <issue_description> </issue_description> tag, it's the most important part to analyze the issue's clarity.
-
-Ignore the this part: "Can you help me implement the necessary changes... Follow these phases to
-resolve the issue:\n\nPhase 1. ... Phase 2. RUNNING: install and 3. ... EXPLORATION: find the files that are related to the problem and possible solutions ...8.1 Ensure you've fully addressed all requirements"
-This part belongs to a fixed template, user only gives the instructions in <issue_description> </issue_description> tag.

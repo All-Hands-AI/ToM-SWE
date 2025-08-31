@@ -72,9 +72,7 @@ except ImportError:
 litellm.set_verbose = False
 
 # LLM configuration
-DEFAULT_LLM_MODEL = os.getenv(
-    "DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514"
-)
+DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "litellm_proxy/gpt-5-2025-04-16")
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
 LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
 
