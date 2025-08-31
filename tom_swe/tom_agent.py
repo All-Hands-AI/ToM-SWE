@@ -40,7 +40,7 @@ from tom_swe.generation import (
     ActionResponse,
     ActionExecutor,
 )
-from tom_swe.prompts import PROMPTS
+from tom_swe.prompts.manager import render_prompt
 from tom_swe.rag_module import RAGAgent, create_rag_agent
 from tom_swe.tom_module import ToMAnalyzer
 from tom_swe.memory.conversation_processor import clean_sessions
@@ -121,7 +121,9 @@ class ToMAgent:
         # LLM configuration - use config values if provided, otherwise fallback to env vars
         self.api_key = config.api_key or LITELLM_API_KEY
         self.api_base = config.api_base or LITELLM_BASE_URL
-        self.file_store = config.file_store or LocalFileStore(root="~/.openhands")
+        self.file_store = config.file_store or LocalFileStore(
+            root="~/Projects/ToM-SWE/data"
+        )
 
         # Create LLM client with our configuration
         llm_config = LLMConfig(
@@ -192,7 +194,7 @@ class ToMAgent:
             [
                 {
                     "role": "system",
-                    "content": PROMPTS["propose_instructions"],
+                    "content": render_prompt("propose_instructions"),
                     "cache_control": {"type": "ephemeral"},  # Cache the system prompt
                 }
             ]
@@ -206,7 +208,7 @@ class ToMAgent:
             + [
                 {
                     "role": "user",
-                    "content": f"-------------context end-------------\n Here is the my instruction for improvement: {original_instruction}\n Now I want you to role-play as me and improve the instruction.",
+                    "content": f"-------------context end-------------\n Here is the user's instruction: {original_instruction}\n",
                 }
             ]
         )
@@ -520,7 +522,7 @@ class ToMAgent:
         user_model = load_user_model(user_id, self.file_store)
         # Step 4: Use workflow controller with preset actions
         messages = [
-            {"role": "system", "content": PROMPTS["sleeptime_compute"]},
+            {"role": "system", "content": render_prompt("sleeptime_compute")},
             {
                 "role": "user",
                 "content": f"Here is the content of the user model (`overall_user_model.json`): {user_model}\nI have {len(unprocessed_sessions)} unprocessed session files that need batch processing:\nSession IDs to process: {unprocessed_sessions}.",

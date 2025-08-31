@@ -222,6 +222,7 @@ class LLMClient:
             completion_args["api_base"] = str(self.config.api_base)
 
         response = completion(**completion_args)
+        breakpoint()
 
         content = response.choices[0].message.content
 

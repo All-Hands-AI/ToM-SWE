@@ -32,6 +32,7 @@ def test_sleeptime():
     for file in os.listdir("./data/example_sessions"):
         session_data = json.load(open(f"./data/example_sessions/{file}"))
         sessions_data.append(session_data)
+    sessions_data = sessions_data[:1]
 
     agent = ToMAgent()
     agent.sleeptime_compute(sessions_data)

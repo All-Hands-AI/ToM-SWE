@@ -15,7 +15,7 @@ from tom_swe.generation.dataclass import (
 )
 from tom_swe.memory.locations import get_overall_user_model_filename
 from tom_swe.memory.local import LocalFileStore
-from tom_swe.prompts import PROMPTS
+from tom_swe.prompts.manager import render_prompt
 
 # Get logger that properly integrates with parent applications like OpenHands
 try:
@@ -76,7 +76,9 @@ class ToMAnalyzer:
             f'📊 Tom: Processing {len(session_data["messages"])} messages',
         )
 
-        for message in session_data["messages"]:
+        for index, message in enumerate(session_data["messages"]):
+            if index == 0:
+                continue
             # Build full session context (all messages)
             role = message.get("role", "unknown")
             content = message.get("content", "")
@@ -130,7 +132,8 @@ class ToMAnalyzer:
             f"📏 Tom: Full context: {len(full_session_context)} chars, Key messages: {len(key_user_messages)} chars",
         )
 
-        prompt = PROMPTS["session_analysis"].format(
+        prompt = render_prompt(
+            "session_analysis",
             full_session_context=full_session_context,
             key_user_messages=key_user_messages,
             session_id=session_id,
@@ -221,7 +224,8 @@ class ToMAnalyzer:
         # Create prompt with session data
         sessions_text = [s.model_dump() for s in session_summaries]
 
-        prompt = PROMPTS["user_analysis"].format(
+        prompt = render_prompt(
+            "user_analysis",
             user_id=self.user_id,
             num_sessions=len(session_summaries),
             sessions_text=sessions_text,

@@ -23,6 +23,8 @@ dependencies = [
     "typing-extensions>=4.0.0",
     "tqdm>=4.65.0",
     "aiofiles>=23.0.0",
+    # Template engine
+    "jinja2>=3.0.0",
     # API dependencies
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",

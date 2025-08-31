@@ -13,7 +13,7 @@ from .generate import (
 )
 from .output_parsers import PydanticOutputParser
 
-# Note: Prompts moved to tom_swe.prompts.registry for centralized management
+# Note: Prompts now use Jinja2 templates in tom_swe.prompts.templates
 from .action import ActionExecutor
 from .dataclass import ActionType, ActionResponse
 
