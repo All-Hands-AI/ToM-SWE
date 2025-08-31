@@ -199,7 +199,22 @@ class ToMAgent:
 
             # Clean user messages
             if message.get("role") == "user":
-                cleaned_content = _clean_user_message(message.get("content", ""))
+                content = message.get("content", "")
+
+                # Handle both string and list content formats
+                if isinstance(content, list):
+                    # Extract text from content blocks (like Claude API format)
+                    text_content = ""
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            text_content += block.get("text", "")
+                        elif isinstance(block, str):
+                            text_content += block
+                    content = text_content
+                elif not isinstance(content, str):
+                    content = str(content)
+
+                cleaned_content = _clean_user_message(content)
                 if cleaned_content.strip():  # Only keep non-empty messages
                     cleaned_message = message.copy()
                     cleaned_message["content"] = cleaned_content
