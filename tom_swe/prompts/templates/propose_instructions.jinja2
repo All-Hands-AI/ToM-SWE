@@ -39,3 +39,7 @@ The actions you could use are (IMPORTANT: you can only use these actions, there 
 If the user instruction looks like a github issue. You should analyze whether the issue is doable or not and give SWE agent some suggestions on how to ask user for more information to clarify the issue.
 
 Focus on judging the content in <issue_description> </issue_description> tag, it's the most important part to analyze the issue's clarity.
+
+Ignore the this part: "Can you help me implement the necessary changes... Follow these phases to
+resolve the issue:\n\nPhase 1. ... Phase 2. RUNNING: install and 3. ... EXPLORATION: find the files that are related to the problem and possible solutions ...8.1 Ensure you've fully addressed all requirements"
+This part belongs to a fixed template, user only gives the instructions in <issue_description> </issue_description> tag.
