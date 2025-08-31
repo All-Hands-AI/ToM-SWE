@@ -43,7 +43,7 @@ from tom_swe.generation import (
 from tom_swe.prompts.manager import render_prompt
 from tom_swe.rag_module import RAGAgent, create_rag_agent
 from tom_swe.tom_module import ToMAnalyzer
-from tom_swe.memory.conversation_processor import clean_sessions
+from tom_swe.memory.conversation_processor import clean_sessions, _clean_user_message
 from tom_swe.memory.local import LocalFileStore
 from tom_swe.memory.locations import (
     get_cleaned_session_filename,
@@ -188,6 +188,28 @@ class ToMAgent:
         # Ensure formatted_messages is not None
         if formatted_messages is None:
             formatted_messages = []
+
+        # Clean original instruction to remove system tags
+        cleaned_original_instruction = _clean_user_message(original_instruction)
+
+        # Clean user messages in formatted_messages (following tom_module logic)
+        cleaned_formatted_messages = []
+        for index, message in enumerate(formatted_messages):
+            # Skip the first message (system message or similar)
+            if index == 0:
+                continue
+
+            # Clean user messages
+            if message.get("role") == "user":
+                cleaned_content = _clean_user_message(message.get("content", ""))
+                if cleaned_content.strip():  # Only keep non-empty messages
+                    cleaned_message = message.copy()
+                    cleaned_message["content"] = cleaned_content
+                    cleaned_formatted_messages.append(cleaned_message)
+            else:
+                # Keep non-user messages as is
+                cleaned_formatted_messages.append(message)
+
         # Early stop: Quick clarity assessment for caching optimization
         logger.info("🔍 Performing early clarity assessment")
         propose_instructions_messages: List[Dict[str, Any]] = (
@@ -204,11 +226,11 @@ class ToMAgent:
                     "content": f"Here is the content of the overall_user_model (`overall_user_model.json`): {user_model}\n Below is the agent-user interaction context:\n-------------context start-------------",
                 }
             ]
-            + formatted_messages
+            + cleaned_formatted_messages
             + [
                 {
                     "role": "user",
-                    "content": f"-------------context end-------------\n Here is the user's instruction: {original_instruction}\n",
+                    "content": f"-------------context end-------------\n Here is the user's instruction: {cleaned_original_instruction}\n",
                 }
             ]
         )
@@ -245,13 +267,13 @@ class ToMAgent:
 
         # Post-process the instruction with formatted output
         final_instruction = format_proposed_instruction(
-            original_instruction=original_instruction,
+            original_instruction=cleaned_original_instruction,
             improved_instruction=result.improved_instruction,
             confidence_score=result.confidence_score,
         )
 
         return InstructionImprovement(
-            original_instruction=original_instruction,
+            original_instruction=cleaned_original_instruction,
             improved_instruction=final_instruction,
             confidence_score=result.confidence_score,
         )

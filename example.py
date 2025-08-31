@@ -63,37 +63,12 @@ def main():
 
         # Example instruction to improve
         user_id = ""  # Use default_user for demo
-        instruction = "why not ask the ToM agent for help?"
-        context = """Hello! I'm doing well, thank you for asking! I'm here and ready to help you with any tasks you might have.
-I can see I'm currently in your /Users/xuhuizhou/Projects/OpenHands/workspace directory. Whether you need help with:
-- Code development or debugging
-- File management and editing
-- Running tests or applications
-- Git operations
-- Or any other technical tasks
-Just let me know what you'd like to work on, and I'll be happy to assist! What can I help you with today?"""
-
-        print(f"\n2. Testing instruction: '{instruction}'")
-        print(f"   User: {user_id}")
-        print(f"   Context: {context}")
-
-        # Create formatted messages with caching support
-        formatted_messages = [
-            {
-                "role": "system",
-                "content": "You are a helpful assistant.",
-                "cache_control": {"type": "ephemeral"},  # Cache system message
-            },
-            {
-                "role": "assistant",
-                "content": [{"type": "text", "text": context}],  # Context message
-            },
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": instruction}],  # Main instruction
-            },
-        ]
-
+        formatted_messages = []
+        with open("./data/improve_instruction_example/context_swe_interact.jsonl") as f:
+            lines = f.readlines()
+            for line in lines:
+                formatted_messages.append(json.loads(line))
+        instruction = formatted_messages[-1]["content"][0]["text"]
         # Get improved instructions using new API
         recommendation = agent.propose_instructions(
             user_id=user_id,
@@ -113,7 +88,6 @@ Just let me know what you'd like to work on, and I'll be happy to assist! What c
 
     except Exception as e:
         print(f"❌ Error: {e}")
-        print("Make sure you have configured your API credentials in the .env file")
 
 
 if __name__ == "__main__":

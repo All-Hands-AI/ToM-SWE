@@ -36,7 +36,7 @@ class CleanSession:
 
 
 def _clean_user_message(content: str) -> str:
-    """Remove system tags from user message."""
+    """Remove system tags and templates from user message."""
     patterns = [
         r"<REPOSITORY_INFO>.*?</REPOSITORY_INFO>",
         r"<RUNTIME_INFORMATION>.*?</RUNTIME_INFORMATION>",
@@ -44,6 +44,8 @@ def _clean_user_message(content: str) -> str:
         r"<ENVIRONMENT>.*?</ENVIRONMENT>",
         r"<CONTEXT>.*?</CONTEXT>",
         r"<system-reminder>.*?</system-reminder>",
+        # Remove phase-based template that starts with "Follow these phases to resolve the issue:"
+        r"Follow these phases to resolve the issue:.*?(?=\n\n(?![0-9]+\.|Phase [0-9]+\.)|$)",
     ]
 
     cleaned = content
