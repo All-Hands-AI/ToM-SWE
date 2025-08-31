@@ -117,7 +117,7 @@ def format_proposed_instruction(
     improved_instruction: str,
     confidence_score: float,
 ) -> str:
-    final_instruction = f"""The user's original message was: '{original_instruction}'
+    final_instruction = f"""See the original user instruction in the above message history.
 Based on the conversation context and user patterns, here's a suggestion to help swe agent better understand and help the user:
 *****************ToM Agent Analysis Start Here*****************
 💡 Improved Instruction (IMPORTANT!)
