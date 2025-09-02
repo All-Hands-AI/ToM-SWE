@@ -31,7 +31,6 @@ from tom_swe.memory.locations import (
     get_session_models_dir,
 )
 from tom_swe.memory.store import FileStore
-from tom_swe.memory.local import LocalFileStore
 
 try:
     from tom_swe.logging_config import get_tom_swe_logger
@@ -48,8 +47,8 @@ class ActionExecutor:
     def __init__(
         self,
         user_id: str,
+        file_store: FileStore,
         agent_context: Optional[Any] = None,
-        file_store: Optional[FileStore] = None,
     ):
         """
         Initialize the action executor.
@@ -59,7 +58,7 @@ class ActionExecutor:
             file_store: FileStore for I/O operations
         """
         self.agent_context = agent_context
-        self.file_store = file_store or LocalFileStore(root="~/.openhands")
+        self.file_store = file_store
         self.user_id = user_id
 
     def execute_action(

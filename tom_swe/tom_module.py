@@ -14,7 +14,7 @@ from tom_swe.generation.dataclass import (
     SessionSummary,
 )
 from tom_swe.memory.locations import get_overall_user_model_filename
-from tom_swe.memory.local import LocalFileStore
+from tom_swe.memory.store import FileStore
 from tom_swe.prompts.manager import render_prompt
 
 # Get logger that properly integrates with parent applications like OpenHands
@@ -35,6 +35,7 @@ class ToMAnalyzer:
     def __init__(
         self,
         llm_client: LLMClient,
+        file_store: FileStore,
         session_batch_size: int = 3,
         user_id: str = "",
     ) -> None:
@@ -42,6 +43,7 @@ class ToMAnalyzer:
         self.session_batch_size = session_batch_size
         self.user_id = user_id
         self.llm_client = llm_client
+        self.file_store = file_store
 
     async def analyze_session(self, session_data: Dict[str, Any]) -> SessionAnalysis:
         """
@@ -169,9 +171,9 @@ class ToMAnalyzer:
         )
 
         # Auto-update overall_user_model if it exists
-        file_store = LocalFileStore("usermodeling")
         user_model_path = get_overall_user_model_filename(self.user_id)
-        if file_store.exists(user_model_path):
+        breakpoint()
+        if self.file_store.exists(user_model_path):
             logger.log(CLI_DISPLAY_LEVEL, "🔄 Tom: Auto-updating overall user model")
             await self._auto_update_user_model(session_analysis)
             logger.log(CLI_DISPLAY_LEVEL, "✅ Tom: User model updated")
@@ -185,12 +187,9 @@ class ToMAnalyzer:
         try:
             import json
 
-            # Use LocalFileStore for file operations
-            file_store = LocalFileStore("usermodeling")
             user_model_path = get_overall_user_model_filename(self.user_id)
 
-            # Load existing user model (we know it exists from the condition)
-            user_model_content = file_store.read(user_model_path)
+            user_model_content = self.file_store.read(user_model_path)
             user_model = json.loads(user_model_content)
 
             # Add new session summary to the model
@@ -210,7 +209,7 @@ class ToMAnalyzer:
 
             # Save updated model
             updated_content = json.dumps(user_model, indent=2)
-            file_store.write(user_model_path, updated_content)
+            self.file_store.write(user_model_path, updated_content)
 
         except Exception as e:
             # Log error but don't fail the session analysis

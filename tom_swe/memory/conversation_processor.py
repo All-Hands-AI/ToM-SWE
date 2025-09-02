@@ -8,7 +8,6 @@ from dataclasses import dataclass, asdict
 from typing import Dict, List, Any, Optional, Callable, TypeVar
 from .store import UserModelStore
 from .locations import get_cleaned_session_filename
-from .local import LocalFileStore
 from datetime import datetime
 
 T = TypeVar("T")
@@ -124,7 +123,7 @@ def clean_sessions(
 
         # Create CleanSessionStore for this session
         store = CleanSessionStore(
-            file_store=file_store or LocalFileStore(root="~/.openhands"),
+            file_store=file_store,
             clean_session=clean_session,
         )
 
@@ -183,8 +182,6 @@ class CleanSessionStore(UserModelStore):
     ) -> "CleanSessionStore":
         """Get a clean session store instance."""
         file_store = getattr(config, "file_store", None) if config else None
-        if not file_store:
-            file_store = LocalFileStore("~/.openhands")
         # Need a clean_session - this would be provided differently
         clean_session = CleanSession(
             session_id="", start_time="", end_time="", messages=[]

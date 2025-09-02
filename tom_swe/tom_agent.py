@@ -120,9 +120,7 @@ class ToMAgent:
         # LLM configuration - use config values if provided, otherwise fallback to env vars
         self.api_key = config.api_key or LITELLM_API_KEY
         self.api_base = config.api_base or LITELLM_BASE_URL
-        self.file_store = config.file_store or LocalFileStore(
-            root="~/Projects/ToM-SWE/data"
-        )
+        self.file_store = config.file_store or LocalFileStore(root="~/.openhands")
 
         # Create LLM client with our configuration
         llm_config = LLMConfig(
@@ -136,6 +134,7 @@ class ToMAgent:
         self.tom_analyzer = ToMAnalyzer(
             llm_client=self.llm_client,
             user_id="",  # Default to empty string as per the new API
+            file_store=self.file_store,
         )
 
         # RAG agent will be initialized when needed (only if RAG is enabled)

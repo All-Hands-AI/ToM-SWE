@@ -64,7 +64,7 @@ def main():
         # Example instruction for consultation
         user_id = ""  # Use default_user for demo
         formatted_messages = []
-        with open("./data/improve_instruction_example/context_swe_interact.jsonl") as f:
+        with open("./data/improve_instruction_example/example.jsonl") as f:
             lines = f.readlines()
             for line in lines:
                 formatted_messages.append(json.loads(line))
@@ -92,8 +92,8 @@ def main():
 
 if __name__ == "__main__":
     # Test the sleeptime function first
-    # test_sleeptime()
+    test_sleeptime()
     # print("\n" + "=" * 50 + "\n")
 
     # Then run the main ToM agent demo
-    main()
+    # main()
