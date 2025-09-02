@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Simple example demonstrating the ToM Agent's propose_instructions function.
+Simple example demonstrating the ToM Agent's consultation functionality.
 
-This script shows how to use the Theory of Mind Agent to improve user instructions
-using real LLM analysis instead of mocks.
+This script shows how to use the Theory of Mind Agent to provide guidance and
+consultation for SWE agents using real LLM analysis instead of mocks.
 
 Requirements:
 - Set up environment: uv run tom-config
@@ -45,8 +45,8 @@ def test_sleeptime():
 
 
 def main():
-    """Demonstrate the propose_instructions function."""
-    print("🤖 ToM Agent - Propose Instructions Example")
+    """Demonstrate the ToM Agent consultation functionality."""
+    print("🤖 ToM Agent - Consultation Example")
     print("=" * 50)
 
     # Check if API key is configured
@@ -61,7 +61,7 @@ def main():
         agent = ToMAgent(config)
         print("✅ Agent initialized successfully")
 
-        # Example instruction to improve
+        # Example instruction for consultation
         user_id = ""  # Use default_user for demo
         formatted_messages = []
         with open("./data/improve_instruction_example/context_swe_interact.jsonl") as f:
@@ -69,10 +69,10 @@ def main():
             for line in lines:
                 formatted_messages.append(json.loads(line))
         instruction = formatted_messages[-1]["content"][0]["text"]
-        # Get improved instructions using new API
-        recommendation = agent.propose_instructions(
+        # Get consultation guidance using ToM API
+        recommendation = agent.give_suggestions(
             user_id=user_id,
-            original_instruction=instruction,
+            query=instruction,
             formatted_messages=formatted_messages,
         )
 
@@ -80,7 +80,7 @@ def main():
         if recommendation:
             rec = recommendation
             print(f"   ✅ Confidence: {rec.confidence_score:.0%}")
-            print(f"   📝 Improved instruction:\n{rec.improved_instruction}")
+            print(f"   📝 Consultation guidance:\n{rec.suggestions}")
         else:
             print("   ❌ No recommendations generated")
 

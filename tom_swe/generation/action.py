@@ -19,7 +19,7 @@ from tom_swe.generation.dataclass import (
     UpdateJsonFieldParams,
     AnalyzeSessionParams,
     InitializeUserProfileParams,
-    GenerateInstructionImprovementParams,
+    GenerateSuggestionsParams,
     GenerateSleepSummaryParams,
     RagSearchParams,
     SessionAnalysis,
@@ -64,7 +64,7 @@ class ActionExecutor:
 
     def execute_action(
         self, action: ActionType, parameters: Any
-    ) -> str | GenerateInstructionImprovementParams | GenerateSleepSummaryParams:
+    ) -> str | GenerateSuggestionsParams | GenerateSleepSummaryParams:
         """
         Execute a specific action with given parameters.
 
@@ -79,11 +79,9 @@ class ActionExecutor:
         logger.info(f"📋 Parameters: {parameters}")
 
         # Handle final response actions - these contain the response data in parameters
-        if action == ActionType.GENERATE_INSTRUCTION_IMPROVEMENT:
-            logger.info(
-                "📤 Final response action: returning instruction improvement data"
-            )
-            assert isinstance(parameters, GenerateInstructionImprovementParams)
+        if action == ActionType.GENERATE_SUGGESTIONS:
+            logger.info("📤 Final response action: returning suggestions data")
+            assert isinstance(parameters, GenerateSuggestionsParams)
             return parameters  # Return the structured response data directly
         elif action == ActionType.GENERATE_SLEEP_SUMMARY:
             logger.info("📤 Final response action: returning sleep summary data")

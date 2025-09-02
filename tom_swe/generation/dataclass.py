@@ -30,7 +30,7 @@ class ActionType(Enum):
     RAG_SEARCH = "rag_search"
 
     # Final Response Actions (contain structured response data in parameters)
-    GENERATE_INSTRUCTION_IMPROVEMENT = "generate_instruction_improvement"
+    GENERATE_SUGGESTIONS = "generate_suggestions"
     GENERATE_SLEEP_SUMMARY = "generate_sleep_summary"
 
 
@@ -109,11 +109,11 @@ class RagSearchParams(BaseModel):
     )
 
 
-class GenerateInstructionImprovementParams(BaseModel):
-    """Parameters for GENERATE_INSTRUCTION_IMPROVEMENT action - contains the final instruction improvement response."""
+class GenerateSuggestionsParams(BaseModel):
+    """Parameters for GENERATE_SUGGESTIONS action - contains suggestions to help SWE agent make better decisions through user modeling."""
 
-    improved_instruction: str = Field(
-        description="Personalized suggestions for the SWE agent on how to better understand and help the user"
+    suggestions: str = Field(
+        description="Personalized suggestions for the SWE agent on how to better understand and help the user based on user modeling"
     )
     confidence_score: float = Field(
         ge=0.0,
@@ -138,7 +138,7 @@ ActionParams = Union[
     AnalyzeSessionParams,
     InitializeUserProfileParams,
     RagSearchParams,
-    GenerateInstructionImprovementParams,
+    GenerateSuggestionsParams,
     GenerateSleepSummaryParams,
 ]
 
@@ -232,15 +232,15 @@ class ClarityAssessment(BaseModel):
     )
 
 
-class InstructionImprovement(BaseModel):
-    """Pydantic model for an instruction recommendation."""
+class SWEAgentSuggestion(BaseModel):
+    """Pydantic model for suggestions to help SWE agent make better decisions through user modeling."""
 
-    original_instruction: str = Field(
-        description="The original instruction that was improved"
+    original_query: str = Field(
+        description="The original query or instruction that was analyzed"
     )
-    improved_instruction: str = Field(
-        description="The improved instruction personalized to the user in markdown format"
+    suggestions: str = Field(
+        description="The suggestions for the SWE agent based on user modeling and context analysis"
     )
     confidence_score: float = Field(
-        ge=0.0, le=1.0, description="Confidence score for the personalization quality"
+        ge=0.0, le=1.0, description="Confidence score for the suggestion quality"
     )

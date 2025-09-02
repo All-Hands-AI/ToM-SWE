@@ -16,7 +16,7 @@ except ImportError:
     pass
 
 from tom_swe.generation.dataclass import (
-    InstructionImprovement,
+    SWEAgentSuggestion,
     UserAnalysis,
     SessionAnalysis,
     UserMessageAnalysis,
@@ -49,7 +49,7 @@ __description__ = "LLM-powered Theory of Mind analysis for user behavior predict
 __all__ = [
     "ChunkingConfig",
     "Document",
-    "InstructionImprovement",
+    "SWEAgentSuggestion",
     "UserAnalysis",
     "RAGAgent",
     "RetrievalResult",
