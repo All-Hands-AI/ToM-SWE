@@ -25,8 +25,8 @@ class TestPromptManager:
         templates = self.manager.list_templates()
 
         expected_templates = [
+            "give_suggestions",
             "message_condensation",
-            "propose_instructions",
             "session_analysis",
             "sleeptime_compute",
             "user_analysis",
@@ -86,10 +86,10 @@ class TestPromptManager:
         assert "user modeling expert" in sleeptime_result
         assert "UPDATE_JSON_FIELD" in sleeptime_result
 
-        # Test propose_instructions
-        propose_result = self.manager.render("propose_instructions")
-        assert "ToM (theory of mind) Agent" in propose_result
-        assert "expert in modeling user's mental state" in propose_result
+        # Test give_suggestions
+        suggestions_result = self.manager.render("give_suggestions")
+        assert "ToM (theory of mind) Agent" in suggestions_result
+        assert "expert in modeling user's mental state" in suggestions_result
 
     def test_render_nonexistent_template(self) -> None:
         """Test that rendering non-existent template raises error."""
