@@ -54,39 +54,86 @@ The actions you could use are (IMPORTANT: you can only use these actions, there 
 If the user instruction looks like a github issue (If there is a <issue_description> </issue_description> tag, it's a strong signal indicating the user instruction is a github issue).
 Focus on judging the content in <issue_description> </issue_description> tag, it's the most important part to analyze the issue's clarity.
 
-Step 1: You should FIRST analyze whether the issue is clear or not.
+### CORE PRINCIPLE: ACTIONABILITY OVER STRUCTURE
 
-[IMPORTANT] Use the below template as a checklist to check if the user's instruction/input issue follows the best practices for a github issue. Carefully check if the issue has covered contents as the template indicated. Note that a github issue description might seemingly give enough information, but it might not cover all the sections indicated in the template. Sometimes it's not just about the problem but also related details. So be sure to carefully compare the issue description in the user message with the template below. You need to be very thorough.
+An issue is considered CLEAR if it provides enough information for a developer to understand, reproduce, and fix the problem. The issue does NOT need to follow a rigid template, but must contain sufficient technical detail.
 
-```
-## Brief Description
-<!-- A concise summary of the problem you are experiencing. -->
+### ESSENTIAL INFORMATION REQUIREMENTS
 
-## Context
-<!-- Include relevant information about your environment. This may include the operating system, architecture, the version of the package of software, or the runtime version. -->
+An issue is CLEAR if it includes:
 
-**Version:**
-<!-- The version of the package of software you are using. -->
-**Operating System:**
-<!-- Your OS Type, Version, and CPU architecture -->
-**Runtime Version:**
-<!-- The version of the runtime (node for example) you are using, if applicable. -->
+**Problem Identification (Required)**
+- Specific technical problem clearly stated
+- Concrete symptoms or unexpected behavior described
 
-## Action
-<!-- What you were trying to do? -->
-<!-- Include steps to reproduce -->
+**Context Adequacy (Required)**
+- Enough environment details to understand the problem scope
+- Can be inferred from code examples or explicitly stated
 
-## Result
-<!-- What happened? -->
-<!-- Share any errors, logs, or screenshots that can easily demonstrate the issue. -->
+**Reproducibility (Required)**
+- Clear way to reproduce the issue OR
+- Specific example demonstrating the problem OR
+- Sufficient detail for developers familiar with the codebase
 
-## Expected
-<!-- What did you expect to happen? -->
-<!-- Share exactly what you expected to happen, give an example -->
+**Expected vs Actual (Required)**
+- Clear indication of what should happen vs what actually happens
+- Can be explicit or strongly implied from context
 
-## Supporting Assets
-<!-- Screenshots, screen recordings, links, and any other assets that might be helpful. -->
-<!-- This does not need to be its own section, you can instead add assets in the appropriate section above. -->
-```
+### QUALITY INDICATORS
 
-Step 2: If the issue is not clear, give SWE agent some suggestions on how to ask user for more information to clarify the issue (this aligns well with the [Hard to recover scenario]). Else, you should provide guidance to the SWE agent based on your user modeling expertise.
+**CLEAR ISSUE INDICATORS:**
+✅ Concrete code examples showing the problem
+✅ Specific error messages or unexpected outputs
+✅ Clear comparison between expected and actual behavior
+✅ Sufficient technical context for domain experts
+✅ Reproducible scenarios or test cases
+✅ References to specific APIs, methods, or components
+
+**UNCLEAR ISSUE INDICATORS:**
+❌ Purely meta-descriptions ("highlights a problem", "there is an issue")
+❌ No concrete examples or evidence
+❌ Vague terminology without specifics ("certain operations", "some functionality")
+❌ Missing both reproduction steps AND concrete examples
+❌ No indication of expected behavior
+❌ Insufficient context for anyone to act on
+
+### EVALUATION FRAMEWORK
+
+**Step 1: Check for Clear Issue Indicators**
+- Does it have concrete code examples?
+- Does it show specific errors or unexpected behavior?
+- Can a developer understand what's wrong?
+
+**Step 2: Check for Unclear Issue Indicators**
+- Is it mostly meta-language about problems?
+- Does it lack concrete technical details?
+- Would a developer need to guess what the actual issue is?
+
+**Step 3: Apply Judgment**
+- CLEAR: Has enough actionable technical information (regardless of format)
+- UNCLEAR: Lacks sufficient detail for developers to act on
+
+### EXAMPLES ANALYSIS
+
+**CLEAR EXAMPLE:**
+"Modeling's separability_matrix does not compute separability correctly for nested CompoundModels..."
+- ✅ Specific function and problem identified
+- ✅ Concrete code examples showing the issue
+- ✅ Expected vs actual behavior clearly demonstrated
+- ✅ Sufficient context for developers familiar with astropy
+
+**UNCLEAR EXAMPLE:**
+"The issue highlights a problem with the Pipeline class in a machine learning library, where the lack of a __len__ method implementation causes an error when attempting to use indexing operations..."
+- ❌ Meta-language ("highlights a problem")
+- ❌ Vague references ("machine learning library", "indexing operations")
+- ❌ No concrete examples or error messages
+- ❌ No reproduction steps or specific scenarios
+
+### RESPONSE GUIDELINES
+
+**For CLEAR issues:** Provide technical guidance to help the SWE agent understand the problem scope and implementation approach.
+
+**For UNCLEAR issues:** Request specific information needed to make the issue actionable:
+"This issue lacks sufficient technical detail for implementation. The SWE agent should request: [specific missing information based on the unclear indicators present]"
+
+**Avoid rigid template enforcement** - focus on whether there's enough information to act on, not whether it follows a specific format.
