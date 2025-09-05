@@ -15,6 +15,7 @@ import json
 from dotenv import load_dotenv
 
 from tom_swe.tom_agent import ToMAgent, ToMAgentConfig
+from tom_swe.memory.local import LocalFileStore
 
 # Load environment variables
 load_dotenv()
@@ -57,18 +58,22 @@ def main():
     try:
         # Initialize ToM Agent
         print("\n1. Initializing ToM Agent...")
-        config = ToMAgentConfig()
+        config = ToMAgentConfig(
+            file_store=LocalFileStore(root="~/data"),
+            # llm_model="litellm_proxy/claude-3-7-sonnet-20250219",
+            llm_model="litellm_proxy/claude-sonnet-4-20250514",
+        )
         agent = ToMAgent(config)
         print("✅ Agent initialized successfully")
 
         # Example instruction for consultation
         user_id = ""  # Use default_user for demo
         formatted_messages = []
-        with open("./data/improve_instruction_example/example.jsonl") as f:
+        with open("./data/improve_instruction_example/context_swe_interact.jsonl") as f:
             lines = f.readlines()
             for line in lines:
                 formatted_messages.append(json.loads(line))
-        instruction = formatted_messages[-1]["content"][0]["text"]
+        instruction = f"I am SWE agent. I need to understand the user's intent and expectations for fixing the Pipeline class issue. I need to consult ToM agent about the user's message: {formatted_messages[-1]['content'][0]['text']}"
         # Get consultation guidance using ToM API
         recommendation = agent.give_suggestions(
             user_id=user_id,
@@ -92,8 +97,8 @@ def main():
 
 if __name__ == "__main__":
     # Test the sleeptime function first
-    test_sleeptime()
+    # test_sleeptime()
     # print("\n" + "=" * 50 + "\n")
 
     # Then run the main ToM agent demo
-    # main()
+    main()

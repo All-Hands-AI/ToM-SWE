@@ -120,7 +120,7 @@ class ToMAgent:
         # LLM configuration - use config values if provided, otherwise fallback to env vars
         self.api_key = config.api_key or LITELLM_API_KEY
         self.api_base = config.api_base or LITELLM_BASE_URL
-        self.file_store = config.file_store or LocalFileStore(root="~/.openhands")
+        self.file_store = config.file_store or LocalFileStore(root="~/data")
 
         # Create LLM client with our configuration
         llm_config = LLMConfig(
@@ -243,7 +243,7 @@ class ToMAgent:
             + [
                 {
                     "role": "user",
-                    "content": f"-------------context end-------------\n Here is the user's instruction: {cleaned_query}\n",
+                    "content": f"-------------context end-------------\n Here is <SWE_agent_query>: {cleaned_query}\n",
                 }
             ]
         )
