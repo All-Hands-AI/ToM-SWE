@@ -32,6 +32,7 @@ dependencies = [
     # BM25 search dependencies
     "bm25s>=0.2.0",
     "PyStemmer>=2.2.0",
+    "tiktoken>=0.8.0",
 ]
 
 [project.optional-dependencies]
