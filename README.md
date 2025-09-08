@@ -1,6 +1,6 @@
 # ToM-SWE
 
-Theory of Mind package for SWE agents. Provides personalized instruction improvement and user behavior analysis through a three-tier memory system.
+Theory of Mind package for SWE agents. Provides personalized consultation and guidance for SWE agents through user behavior analysis and a three-tier memory system.
 
 ## Quick Start
 
@@ -19,14 +19,14 @@ Theory of Mind package for SWE agents. Provides personalized instruction improve
 
 3. Run example or configure LLM:
    ```bash
-   uv run python example.py           # See instruction improvement in action
+   uv run python example.py           # See consultation functionality in action
    uv run tom-config                  # Interactive LLM setup
    ```
 
 ## Core Features
 
 - **Three-Tier Memory**: Cleaned sessions → Session analyses → User profiles
-- **Instruction Improvement**: Transforms vague instructions into personalized guidance
+- **Agent Consultation**: Provides personalized guidance and recommendations for SWE agents
 - **User Behavior Analysis**: LLM-powered psychological insights and preferences
 - **OpenHands Integration**: Use `TomCodeActAgent` for automatic instruction enhancement
 
@@ -52,7 +52,7 @@ default_agent = "TomCodeActAgent"
 ```
 
 The agent automatically:
-1. Improves user instructions with personalized suggestions
+1. Provides consultation and personalized guidance to SWE agents
 2. Processes user sessions for better understanding
 3. Shows progress during analysis
 

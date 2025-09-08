@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-Theory of Mind (ToM) Agent for Personalized Instruction Generation
+Theory of Mind (ToM) Agent for Consultation and Guidance
 
-This module implements a ToM agent that combines user behavior analysis with RAG-based
-context retrieval to propose improved instructions and next actions for individual users.
-The agent uses the existing tom_module for user analysis and rag_module for context
-retrieval to provide personalized guidance.
+This module implements a ToM agent that provides consultation and guidance to SWE agents
+by analyzing user behavior patterns and leveraging RAG-based context retrieval. The agent
+supports both user message analysis and custom agent queries to provide personalized
+guidance based on user mental models.
 
 Key Features:
 1. User context analysis using existing mental state models
 2. RAG-based retrieval of relevant user behavior patterns
-3. Personalized instruction generation based on user preferences
-4. Next action recommendations tailored to user's mental state
-5. Integration with existing ToM and RAG infrastructure
+3. Bidirectional consultation supporting user queries and agent questions
+4. Personalized guidance generation based on user preferences and history
+5. Flexible consultation framework for various SWE agent needs
+6. Integration with existing ToM and RAG infrastructure
 """
 
 import logging
@@ -29,7 +30,7 @@ from dotenv import load_dotenv
 
 # Local imports
 from tom_swe.generation.dataclass import (
-    InstructionImprovement,
+    SWEAgentSuggestion,
     AnalyzeSessionParams,
     InitializeUserProfileParams,
 )
@@ -52,7 +53,7 @@ from tom_swe.memory.locations import (
     get_session_model_filename,
 )
 from tom_swe.memory.store import FileStore, load_user_model
-from tom_swe.utils import format_proposed_instruction
+from tom_swe.utils import format_proposed_suggestions
 
 # Load environment variables
 load_dotenv()
@@ -119,9 +120,7 @@ class ToMAgent:
         # LLM configuration - use config values if provided, otherwise fallback to env vars
         self.api_key = config.api_key or LITELLM_API_KEY
         self.api_base = config.api_base or LITELLM_BASE_URL
-        self.file_store = config.file_store or LocalFileStore(
-            root="~/Projects/ToM-SWE/data"
-        )
+        self.file_store = config.file_store or LocalFileStore(root="~/data")
 
         # Create LLM client with our configuration
         llm_config = LLMConfig(
@@ -136,6 +135,7 @@ class ToMAgent:
             llm_client=self.llm_client,
             file_store=self.file_store,  # type: ignore[arg-type]
             user_id="",  # Default to empty string as per the new API
+            file_store=self.file_store,
         )
 
         # RAG agent will be initialized when needed (only if RAG is enabled)
@@ -151,28 +151,33 @@ class ToMAgent:
             f"ToM Agent initialized with model: {self.llm_model}, RAG: {rag_status}"
         )
 
-    def propose_instructions(
+    def give_suggestions(
         self,
         user_id: str | None = "",
-        original_instruction: str = "",
+        query: str = "",
         formatted_messages: List[Dict[str, Any]] | None = None,
-    ) -> InstructionImprovement | None:
+    ) -> SWEAgentSuggestion | None:
         """
-        Propose improved instructions using workflow controller.
+        Provide consultation and guidance using workflow controller.
+
+        This function serves as the main consultation interface, supporting both user message
+        analysis and custom agent queries. It leverages user modeling and conversation context
+        to provide personalized guidance.
 
         Args:
-            user_id: The user ID to analyze and generate instructions for
+            user_id: The user ID to analyze and generate guidance for
+            query: The original instruction/query to analyze
             formatted_messages: List of formatted message dicts with cache support
 
         Returns:
-            Instruction recommendation
+            Consultation guidance and recommendations based on user modeling
         """
-        # return InstructionImprovement(
-        #     original_instruction=original_instruction,
-        #     improved_instruction="test tom improve instruction",
+        # return SWEAgentSuggestion(
+        #     original_query=query,
+        #     suggestions="test tom consultation suggestions",
         #     confidence_score=0.9,
         # )
-        logger.info(f"🎯 Proposing instructions for user {user_id}")
+        logger.info(f"🎯 Providing consultation for user {user_id}")
         if user_id is None:
             user_id = ""
         assert isinstance(
@@ -189,15 +194,11 @@ class ToMAgent:
             formatted_messages = []
 
         # Clean original instruction to remove system tags
-        cleaned_original_instruction = _clean_user_message(original_instruction)
+        cleaned_query = _clean_user_message(query)
 
         # Clean user messages in formatted_messages (following tom_module logic)
         cleaned_formatted_messages = []
         for index, message in enumerate(formatted_messages):
-            # Skip the first message (system message or similar)
-            if index == 0:
-                continue
-
             # Clean user messages
             if message.get("role") == "user":
                 content = message.get("content", "")
@@ -223,14 +224,13 @@ class ToMAgent:
             else:
                 # Keep non-user messages as is
                 cleaned_formatted_messages.append(message)
-
-        # Early stop: Quick clarity assessment for caching optimization
-        logger.info("🔍 Performing early clarity assessment")
+        # Early stop: Quick consultation assessment for caching optimization
+        logger.info("🔍 Performing consultation assessment")
         propose_instructions_messages: List[Dict[str, Any]] = (
             [
                 {
                     "role": "system",
-                    "content": render_prompt("propose_instructions"),
+                    "content": render_prompt("give_suggestions"),
                     "cache_control": {"type": "ephemeral"},  # Cache the system prompt
                 }
             ]
@@ -244,7 +244,7 @@ class ToMAgent:
             + [
                 {
                     "role": "user",
-                    "content": f"-------------context end-------------\n Here is the user's instruction: {cleaned_original_instruction}\n",
+                    "content": f"-------------context end-------------\n Here is <SWE_agent_query>: {cleaned_query}\n",
                 }
             ]
         )
@@ -258,12 +258,12 @@ class ToMAgent:
             #     output_type=ClarityAssessment,
             # )
             clarity_result = None
-            # Early stop if clarity is sufficient
+            # Early stop if no consultation needed
             if clarity_result and clarity_result.is_clear:
                 logger.info(
                     f"✅ Early stop: Intent is clear - {clarity_result.reasoning}"
                 )
-                # Return minimal improvement for clear instructions
+                # Return None if no additional guidance needed
                 return None
             else:
                 # propose_instructions_messages.append(
@@ -279,20 +279,20 @@ class ToMAgent:
             logger.warning(f"Clarity assessment failed: {e}, exit")
             return None
 
-        # Post-process the instruction with formatted output
-        final_instruction = format_proposed_instruction(
-            original_instruction=cleaned_original_instruction,
-            improved_instruction=result.improved_instruction,
+        # Post-process the suggestions with formatted output
+        final_suggestions = format_proposed_suggestions(
+            query=cleaned_query,
+            suggestions=result.suggestions,
             confidence_score=result.confidence_score,
         )
 
-        return InstructionImprovement(
-            original_instruction=cleaned_original_instruction,
-            improved_instruction=final_instruction,
+        return SWEAgentSuggestion(
+            original_query=cleaned_query,
+            suggestions=final_suggestions,
             confidence_score=result.confidence_score,
         )
 
-    def _get_relevant_behavior_sync(self, original_instruction: str) -> str:
+    def _get_relevant_behavior_sync(self, query: str) -> str:
         """Get relevant user behavior from RAG if enabled (synchronous)."""
         if not self.enable_rag:
             return "RAG disabled - using user context only"
@@ -307,7 +307,7 @@ class ToMAgent:
         )
 
         # Build direct query for user message search
-        rag_query = original_instruction  # Search directly against user messages
+        rag_query = query  # Search directly against user messages
 
         # Log the query content and token count
         query_tokens = len(rag_query.split()) * 1.3  # Rough estimate
@@ -423,7 +423,6 @@ class ToMAgent:
             logger.log(CLI_DISPLAY_LEVEL, f"🧠 Agent reasoning: {response.reasoning}")
             logger.log(CLI_DISPLAY_LEVEL, f"⚡ Agent action: {response.action.value}")
             logger.log(CLI_DISPLAY_LEVEL, f"🔍 Action parameters: {response.parameters}")
-
             # Execute the action using ActionExecutor
             result = self.action_executor.execute_action(
                 response.action, response.parameters

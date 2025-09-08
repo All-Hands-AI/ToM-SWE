@@ -19,7 +19,7 @@ from tom_swe.generation.dataclass import (
     UpdateJsonFieldParams,
     AnalyzeSessionParams,
     InitializeUserProfileParams,
-    GenerateInstructionImprovementParams,
+    GenerateSuggestionsParams,
     GenerateSleepSummaryParams,
     RagSearchParams,
     SessionAnalysis,
@@ -31,7 +31,6 @@ from tom_swe.memory.locations import (
     get_session_models_dir,
 )
 from tom_swe.memory.store import FileStore
-from tom_swe.memory.local import LocalFileStore
 
 try:
     from tom_swe.logging_config import get_tom_swe_logger
@@ -48,8 +47,8 @@ class ActionExecutor:
     def __init__(
         self,
         user_id: str,
+        file_store: FileStore,
         agent_context: Optional[Any] = None,
-        file_store: Optional[FileStore] = None,
     ):
         """
         Initialize the action executor.
@@ -59,12 +58,12 @@ class ActionExecutor:
             file_store: FileStore for I/O operations
         """
         self.agent_context = agent_context
-        self.file_store = file_store or LocalFileStore(root="~/.openhands")
+        self.file_store = file_store
         self.user_id = user_id
 
     def execute_action(
         self, action: ActionType, parameters: Any
-    ) -> str | GenerateInstructionImprovementParams | GenerateSleepSummaryParams:
+    ) -> str | GenerateSuggestionsParams | GenerateSleepSummaryParams:
         """
         Execute a specific action with given parameters.
 
@@ -79,11 +78,9 @@ class ActionExecutor:
         logger.info(f"📋 Parameters: {parameters}")
 
         # Handle final response actions - these contain the response data in parameters
-        if action == ActionType.GENERATE_INSTRUCTION_IMPROVEMENT:
-            logger.info(
-                "📤 Final response action: returning instruction improvement data"
-            )
-            assert isinstance(parameters, GenerateInstructionImprovementParams)
+        if action == ActionType.GENERATE_SUGGESTIONS:
+            logger.info("📤 Final response action: returning suggestions data")
+            assert isinstance(parameters, GenerateSuggestionsParams)
             return parameters  # Return the structured response data directly
         elif action == ActionType.GENERATE_SLEEP_SUMMARY:
             logger.info("📤 Final response action: returning sleep summary data")

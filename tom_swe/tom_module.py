@@ -15,7 +15,7 @@ from tom_swe.generation.dataclass import (
     SessionSummary,
 )
 from tom_swe.memory.locations import get_overall_user_model_filename
-from tom_swe.memory.local import LocalFileStore
+from tom_swe.memory.store import FileStore
 from tom_swe.prompts.manager import render_prompt
 
 # Get logger that properly integrates with parent applications like OpenHands
@@ -36,7 +36,7 @@ class ToMAnalyzer:
     def __init__(
         self,
         llm_client: LLMClient,
-        file_store: LocalFileStore,
+        file_store: FileStore,
         session_batch_size: int = 3,
         user_id: str = "",
     ) -> None:
@@ -185,10 +185,9 @@ class ToMAnalyzer:
     async def _auto_update_user_model(self, session_analysis: SessionAnalysis) -> None:
         """Auto-update the overall user model with new session information."""
         try:
+
             # Use LocalFileStore for file operations
             user_model_path = get_overall_user_model_filename(self.user_id)
-
-            # Load existing user model (we know it exists from the condition)
             user_model_content = self.file_store.read(user_model_path)
             user_model = json.loads(user_model_content)
 
