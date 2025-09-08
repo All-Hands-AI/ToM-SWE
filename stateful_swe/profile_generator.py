@@ -234,7 +234,7 @@ class RealUserProfileGenerator:
             selected_prefs = selected_prefs[:num_prefs]
 
             profile_config: ProfileConfig = {
-                "profile_id": f"{verbosity}_{timing}_{response_style}_poweruser_{i+1:02d}",
+                "profile_id": f"{verbosity}_{timing}_{response_style}_{i+1:02d}",
                 "verbosity": verbosity,
                 "question_timing": timing,
                 "response_style": response_style,

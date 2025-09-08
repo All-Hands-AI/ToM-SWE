@@ -200,7 +200,7 @@ def main():
     )
     parser.add_argument(
         "--washed-dir",
-        default="data/stateful_swe/washed_sessions_test_async",
+        default="data/stateful_swe/washed_sessions",
         help="Directory containing washed session files",
     )
     parser.add_argument(
