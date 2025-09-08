@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from tom_swe.generation.generate import LLMClient
+import json
 
 # Third-party imports
 
@@ -184,10 +185,9 @@ class ToMAnalyzer:
     async def _auto_update_user_model(self, session_analysis: SessionAnalysis) -> None:
         """Auto-update the overall user model with new session information."""
         try:
-            import json
 
+            # Use LocalFileStore for file operations
             user_model_path = get_overall_user_model_filename(self.user_id)
-
             user_model_content = self.file_store.read(user_model_path)
             user_model = json.loads(user_model_content)
 

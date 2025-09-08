@@ -133,6 +133,7 @@ class ToMAgent:
         # Initialize ToM analyzer with LLM client and FileStore
         self.tom_analyzer = ToMAnalyzer(
             llm_client=self.llm_client,
+            file_store=self.file_store,  # type: ignore[arg-type]
             user_id="",  # Default to empty string as per the new API
             file_store=self.file_store,
         )
