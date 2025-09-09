@@ -14,15 +14,14 @@ If it is about a custom question:
 you should provide guidance to the SWE agent based on your user modeling expertise.
 
 ## Available Actions and Commands
-
 The actions you could use are (IMPORTANT: you can only use these actions, there are might be other operations in the ActionType enum, but you can't use them):
 - `SEARCH_FILE` to find relevant behavior patterns related to the instruction (try to use more general keywords)
     - You only need to use this action if the overall_user_model loaded in the messages is not enough to provide good consultation guidance.
     - Use this action if you think it's necessary to search for more information.
     - The default search method is BM25, so you should frame the query that works for BM25. Usually copying the user's instruction and adding some general keywords to it could give you a good result.
 
-- `READ_FILE` to load user's overall model and preferences
-    - As the overall_user_model is already loaded in the messages, you should not use this action unless there is a very clear reason to do so.
+- `READ_FILE` to read specific files related to user model
+    - As the overall_user_model is already loaded in the messages, you should not use this action to read the overall_user_model file.
     - You should only use this action to read files related to user model NOT the codebase files. It's good to use this action after SEARCH_FILE action since the action will provide relevant files paths to read. However, only use this action when the information is not enough in the search results.
     - You could also use this action directly if you find the query is very specifically related to one of the session summaries in the overall_user_model, and in this case, you should change the character_range to (0, some reasonable number) to read the session (the path would either be `usermodeling/cleaned_sessions/<session_id>.json` or `usermodeling/session_models/<session_id>.json`; the first one is the raw session data, the second one is the analyzed session data).
 

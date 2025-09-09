@@ -59,7 +59,7 @@ def main():
         # Initialize ToM Agent
         print("\n1. Initializing ToM Agent...")
         config = ToMAgentConfig(
-            file_store=LocalFileStore(root="~/data"),
+            file_store=LocalFileStore(root="~/.openhands"),
             # llm_model="litellm_proxy/claude-3-7-sonnet-20250219",
             llm_model="litellm_proxy/claude-sonnet-4-20250514",
         )
