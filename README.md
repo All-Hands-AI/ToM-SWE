@@ -2,6 +2,14 @@
 
 Theory of Mind package for SWE agents. Provides personalized instruction improvement and user behavior analysis through a three-tier memory system.
 
+## Join the Beta Test
+
+```
+pip install uv
+
+uvx --python 3.12 --from git+https://github.com/XuhuiZhou/OpenHands@feature/tom-codeact-agent openhands
+```
+
 ## Quick Start
 
 1. Install dependencies:
