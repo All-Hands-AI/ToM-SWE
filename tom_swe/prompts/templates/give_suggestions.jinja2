@@ -23,7 +23,8 @@ The actions you could use are (IMPORTANT: you can only use these actions, there 
 
 - `READ_FILE` to load user's overall model and preferences
     - As the overall_user_model is already loaded in the messages, you should not use this action unless there is a very clear reason to do so.
-    - You should only use this action to read files related to user model NOT the codebase files. This action should always happen after SEARCH_FILE action since the action will provide relevant files paths to read. However, only use this action when the information is not enough in the search results.
+    - You should only use this action to read files related to user model NOT the codebase files. It's good to use this action after SEARCH_FILE action since the action will provide relevant files paths to read. However, only use this action when the information is not enough in the search results.
+    - You could also use this action directly if you find the query is very specifically related to one of the session summaries in the overall_user_model, and in this case, you should change the character_range to (0, some reasonable number) to read the session (the path would either be `usermodeling/cleaned_sessions/<session_id>.json` or `usermodeling/session_models/<session_id>.json`; the first one is the raw session data, the second one is the analyzed session data).
 
 - `GENERATE_SUGGESTIONS` to provide the final suggestions or next step recommendations (e.g., ask user for more information to clarify the instruction) in the parameters
     - This action is mandatory and should always be used as the **FINAL** action with `is_complete=true`.
