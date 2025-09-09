@@ -9,6 +9,7 @@ pip install uv
 
 uvx --python 3.12 --from git+https://github.com/XuhuiZhou/OpenHands@feature/tom-codeact-agent openhands
 ```
+For details, please refer to the [Google doc](https://docs.google.com/document/d/1P8b1SSF_HYgahK6eO7qSHbOcTv3o3z6SWMH_osyR3_w/edit?usp=sharing)
 
 ## Quick Start
 
