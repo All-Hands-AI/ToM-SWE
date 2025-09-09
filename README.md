@@ -1,6 +1,9 @@
 # ToM-SWE
 
 Theory of Mind package for SWE agents. Provides personalized instruction improvement and user behavior analysis through a three-tier memory system.
+<img width="984" height="608" alt="image (7)" src="https://github.com/user-attachments/assets/35ae908f-a1a7-4686-9f25-cfd8b98d4717" />
+<img width="984" height="440" alt="image (8)" src="https://github.com/user-attachments/assets/44b82018-3836-4d72-8b5b-aab5020bc680" />
+
 
 ## Join the Beta Test
 
