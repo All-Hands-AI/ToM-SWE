@@ -107,7 +107,9 @@ class ActionExecutor:
     def _action_read_file(self, params: ReadFileParams) -> str:
         """Read a file."""
         try:
-            content = self.file_store.read(params.file_path)
+            content = self.file_store.read(params.file_path)[
+                params.character_range[0] : params.character_range[1]
+            ]
             return content
         except Exception as e:
             return f"Error reading {params.file_path}: {str(e)}"
@@ -228,7 +230,7 @@ class ActionExecutor:
 
                 # Get relevant snippet
                 content = corpus[doc_idx]
-                snippet = content[:10000] + "..." if len(content) > 10000 else content
+                snippet = content[:5000] + "..." if len(content) > 5000 else content
 
                 formatted_results.append(
                     f"[Score: {score:.2f}] {file_path}:\n{snippet}"

@@ -135,7 +135,6 @@ class ToMAgent:
             llm_client=self.llm_client,
             file_store=self.file_store,  # type: ignore[arg-type]
             user_id="",  # Default to empty string as per the new API
-            file_store=self.file_store,
         )
 
         # RAG agent will be initialized when needed (only if RAG is enabled)

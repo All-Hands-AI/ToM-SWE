@@ -38,7 +38,13 @@ class ActionType(Enum):
 class ReadFileParams(BaseModel):
     """Parameters for READ_FILE action."""
 
-    file_path: str = Field(description="Path to the file to read")
+    file_path: str = Field(
+        description="Path to the file to read. You are only allowed to read user model related files. "
+    )
+    character_range: tuple[int, int] = Field(
+        default=(5000, 10000),
+        description="Character range to read from the file. The range is inclusive of the start and end characters. Default starts from 5000 since search results would usually give the first 5000 characters of the file.",
+    )
 
 
 class SearchFileParams(BaseModel):
