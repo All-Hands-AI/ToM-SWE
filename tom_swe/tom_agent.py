@@ -176,7 +176,7 @@ class ToMAgent:
         #     suggestions="test tom consultation suggestions",
         #     confidence_score=0.9,
         # )
-        logger.info(f"🎯 Providing consultation for user {user_id}")
+        logger.info("🎯 Providing consultation for SWE agent")
         if user_id is None:
             user_id = ""
         assert isinstance(

@@ -125,6 +125,7 @@ Based on the conversation context and user patterns, here's a suggestion to help
 
 💡 Confidence in the guidance
 The ToM agent is {confidence_score*100:.0f}% confident in this suggestion for SWE agent.
+*****************ToM Agent Analysis End Here*****************
 """
 
     return final_instruction
