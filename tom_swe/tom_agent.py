@@ -33,6 +33,7 @@ from tom_swe.generation.dataclass import (
     SWEAgentSuggestion,
     AnalyzeSessionParams,
     InitializeUserProfileParams,
+    GenerateSuggestionsParams,
 )
 from tom_swe.generation import (
     LLMConfig,
@@ -279,6 +280,11 @@ class ToMAgent:
             return None
 
         # Post-process the suggestions with formatted output
+        if not isinstance(result, GenerateSuggestionsParams):
+            result = GenerateSuggestionsParams(
+                suggestions=f"No suggestions provided, but here are some relevant user behavior patterns: {str(result)}",
+                confidence_score=0.0,
+            )
         final_suggestions = format_proposed_suggestions(
             query=cleaned_query,
             suggestions=result.suggestions,
@@ -400,6 +406,12 @@ class ToMAgent:
 
         logger.info(f"🤖 Starting workflow with {max_iterations} max iterations")
         logger.debug(f"Initial messages: {messages}")
+        messages.append(
+            {
+                "role": "user",
+                "content": f"Please be aware that you only have {max_iterations} iterations/actions to complete the task. You should use the iterations/actions wisely.",
+            }
+        )
 
         for iteration in range(max_iterations):
             logger.info(f"🔄 Workflow iteration {iteration + 1}/{max_iterations}")
