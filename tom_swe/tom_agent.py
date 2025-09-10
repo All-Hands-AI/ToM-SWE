@@ -253,38 +253,27 @@ class ToMAgent:
         ), "Last message must be a user message"
 
         try:
-            # clarity_result = self.llm_client.call_structured_messages(
-            #     messages=propose_instructions_messages,
-            #     output_type=ClarityAssessment,
-            # )
-            clarity_result = None
-            # Early stop if no consultation needed
-            if clarity_result and clarity_result.is_clear:
-                logger.info(
-                    f"✅ Early stop: Intent is clear - {clarity_result.reasoning}"
-                )
-                # Return None if no additional guidance needed
-                return None
-            else:
-                # propose_instructions_messages.append(
-                #     {
-                #         "role": "assistant",
-                #         "content": f"Clarity assessment: {clarity_result.reasoning} (The instruction is clear: {clarity_result.is_clear})",
-                #     }
-                # )
-                result = self._step(
-                    messages=propose_instructions_messages,
-                )
+            result = self._step(
+                messages=propose_instructions_messages,
+            )
         except Exception as e:
             logger.warning(f"Clarity assessment failed: {e}, exit")
             return None
 
         # Post-process the suggestions with formatted output
         if not isinstance(result, GenerateSuggestionsParams):
+            logger.warning(
+                f"Workflow didn't complete properly. Got {type(result)}: {result}"
+            )
+            if isinstance(result, str) and result.strip():
+                fallback_suggestions = f"Workflow incomplete. Last result: {result}"
+            else:
+                fallback_suggestions = "Unable to generate suggestions due to workflow failure. Please try again or contact support."
             result = GenerateSuggestionsParams(
-                suggestions=f"No suggestions provided, but here are some relevant user behavior patterns: {str(result)}",
+                suggestions=fallback_suggestions,
                 confidence_score=0.0,
             )
+
         final_suggestions = format_proposed_suggestions(
             query=cleaned_query,
             suggestions=result.suggestions,
