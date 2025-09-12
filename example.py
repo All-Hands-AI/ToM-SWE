@@ -45,6 +45,22 @@ def test_sleeptime():
     #     print(f"\n🧹 Cleaned up test data: {test_dir}")
 
 
+def test_pure_rag():
+    """Test Pure RAG baseline mode."""
+    print("🔍 Testing Pure RAG Baseline")
+    print("=" * 30)
+    config = ToMAgentConfig(
+        file_store=LocalFileStore(root="~/.openhands"),
+        llm_model="litellm_proxy/claude-sonnet-4-20250514",
+    )
+    agent = ToMAgent(config)
+    query = "Help me fix a bug"
+
+    # Pure RAG mode
+    result = agent.give_suggestions(query=query, pure_rag=True)
+    print(f"{result.suggestions}")
+
+
 def main():
     """Demonstrate the ToM Agent consultation functionality."""
     print("🤖 ToM Agent - Consultation Example")
@@ -100,5 +116,9 @@ if __name__ == "__main__":
     # test_sleeptime()
     # print("\n" + "=" * 50 + "\n")
 
+    # Test pure RAG baseline
+    test_pure_rag()
+    print("\n" + "=" * 50 + "\n")
+
     # Then run the main ToM agent demo
-    main()
+    # main()

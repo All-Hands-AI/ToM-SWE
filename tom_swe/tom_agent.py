@@ -19,7 +19,6 @@ Key Features:
 import logging
 import os
 import json
-import time
 import asyncio
 from dataclasses import dataclass
 from typing import Any, List, Optional, Dict
@@ -34,6 +33,7 @@ from tom_swe.generation.dataclass import (
     AnalyzeSessionParams,
     InitializeUserProfileParams,
     GenerateSuggestionsParams,
+    SearchFileParams,
 )
 from tom_swe.generation import (
     LLMConfig,
@@ -43,7 +43,6 @@ from tom_swe.generation import (
     ActionExecutor,
 )
 from tom_swe.prompts.manager import render_prompt
-from tom_swe.rag_module import RAGAgent, create_rag_agent
 from tom_swe.tom_module import ToMAnalyzer
 from tom_swe.memory.conversation_processor import clean_sessions, _clean_user_message
 from tom_swe.memory.local import LocalFileStore
@@ -138,9 +137,6 @@ class ToMAgent:
             user_id="",  # Default to empty string as per the new API
         )
 
-        # RAG agent will be initialized when needed (only if RAG is enabled)
-        self._rag_agent: Optional[RAGAgent] = None
-
         # Initialize action executor with reference to this agent
         self.action_executor = ActionExecutor(
             user_id="", agent_context=self, file_store=self.file_store
@@ -156,6 +152,7 @@ class ToMAgent:
         user_id: str | None = "",
         query: str = "",
         formatted_messages: List[Dict[str, Any]] | None = None,
+        pure_rag: bool = False,
     ) -> SWEAgentSuggestion | None:
         """
         Provide consultation and guidance using workflow controller.
@@ -168,15 +165,11 @@ class ToMAgent:
             user_id: The user ID to analyze and generate guidance for
             query: The original instruction/query to analyze
             formatted_messages: List of formatted message dicts with cache support
+            pure_rag: If True, use simple RAG baseline without ToM analysis
 
         Returns:
             Consultation guidance and recommendations based on user modeling
         """
-        # return SWEAgentSuggestion(
-        #     original_query=query,
-        #     suggestions="test tom consultation suggestions",
-        #     confidence_score=0.9,
-        # )
         logger.info("🎯 Providing consultation for SWE agent")
         if user_id is None:
             user_id = ""
@@ -186,15 +179,46 @@ class ToMAgent:
 
         # Update the action executor's user_id
         self.action_executor.user_id = user_id
+
+        # Clean original instruction to remove system tags for both modes
+        cleaned_query = _clean_user_message(query)
+
+        # Pure RAG baseline mode - skip complex ToM analysis
+        if pure_rag:
+            logger.info("🔍 Using Pure RAG baseline mode")
+
+            # Use existing BM25 search infrastructure directly
+            search_params = SearchFileParams(
+                query=cleaned_query,
+                search_scope="cleaned_sessions",  # Search all cleaned sessions
+                max_results=3,
+                chunk_size=1000,
+                latest_first=True,
+            )
+            try:
+                search_results = self.action_executor._action_search_file(search_params)
+                return SWEAgentSuggestion(
+                    original_query=cleaned_query,
+                    suggestions=format_proposed_suggestions(
+                        query=cleaned_query,
+                        suggestions=search_results,
+                        confidence_score=0.5,
+                    ),
+                    confidence_score=0.5,  # Medium confidence since it's just retrieval
+                )
+            except Exception as e:
+                logger.warning(f"Pure RAG search failed: {e}")
+                return SWEAgentSuggestion(
+                    original_query=cleaned_query,
+                    suggestions="Pure RAG search failed. No conversation history available.",
+                    confidence_score=0.1,
+                )
         # Build comprehensive prompt for instruction improvement
         user_model = load_user_model(user_id, self.file_store)
 
         # Ensure formatted_messages is not None
         if formatted_messages is None:
             formatted_messages = []
-
-        # Clean original instruction to remove system tags
-        cleaned_query = _clean_user_message(query)
 
         # Clean user messages in formatted_messages (following tom_module logic)
         cleaned_formatted_messages = []
@@ -285,93 +309,6 @@ class ToMAgent:
             suggestions=final_suggestions,
             confidence_score=result.confidence_score,
         )
-
-    def _get_relevant_behavior_sync(self, query: str) -> str:
-        """Get relevant user behavior from RAG if enabled (synchronous)."""
-        if not self.enable_rag:
-            return "RAG disabled - using user context only"
-
-        rag_start_time = time.time()
-        logger.info("⏱️  Starting RAG retrieval for instruction improvement...")
-
-        rag_agent = self._get_rag_module_sync()
-        rag_init_time = time.time()
-        logger.info(
-            f"⏱️  RAG agent initialization: {rag_init_time - rag_start_time:.2f}s"
-        )
-
-        # Build direct query for user message search
-        rag_query = query  # Search directly against user messages
-
-        # Log the query content and token count
-        query_tokens = len(rag_query.split()) * 1.3  # Rough estimate
-        logger.info("🔍 RAG QUERY DEBUG:")
-        logger.info(f"  - Query: '{rag_query}'")
-        logger.info(f"  - Query length: {len(rag_query)} characters")
-        logger.info(f"  - Estimated tokens: ~{query_tokens:.0f}")
-
-        # Retrieve relevant user behavior (retrieval only, no generation)
-        query_start_time = time.time()
-        retrieved_docs = rag_agent.retrieve(rag_query, k=5)
-        query_end_time = time.time()
-
-        # Extract content from retrieved documents (now user messages with context)
-        behavior_parts = []
-        for i, doc in enumerate(retrieved_docs[:3]):  # Use top 3 for context
-            # Format user message with surrounding context
-            user_msg = doc.content
-            metadata = doc.metadata
-
-            # Build context string
-            context_parts = [f"User msg: {user_msg}"]
-
-            # Add session context if available
-            if metadata.get("session_title"):
-                context_parts.append(f"Session: {metadata['session_title']}")
-            if metadata.get("repository_context"):
-                context_parts.append(f"Project: {metadata['repository_context']}")
-
-            # Add surrounding context (now a string)
-            surrounding = metadata.get("surrounding_context", "")
-            if surrounding:
-                context_parts.append(f"Context: {surrounding}")
-
-            behavior_parts.append(f"Context {i+1}:\n" + "\n".join(context_parts))
-
-        relevant_behavior = (
-            "\n\n".join(behavior_parts)
-            if behavior_parts
-            else "No relevant patterns found"
-        )
-
-        total_rag_time = query_end_time - rag_start_time
-        query_time = query_end_time - query_start_time
-        logger.info(f"⏱️  RAG query execution: {query_time:.2f}s")
-        logger.info(f"⏱️  Total RAG time for instructions: {total_rag_time:.2f}s")
-
-        return relevant_behavior
-
-    def _get_rag_module_sync(self) -> RAGAgent:
-        """Get or initialize the RAG agent (synchronous)."""
-        if self._rag_agent is None:
-            logger.info("Initializing RAG agent...")
-            try:
-                loop = asyncio.get_running_loop()
-                self._rag_agent = asyncio.run_coroutine_threadsafe(
-                    create_rag_agent(
-                        llm_model=self.llm_model,
-                    ),
-                    loop,
-                ).result()
-            except RuntimeError:
-                # No event loop running
-                self._rag_agent = asyncio.run(
-                    create_rag_agent(
-                        llm_model=self.llm_model,
-                    )
-                )
-            logger.info("RAG agent initialized successfully")
-        return self._rag_agent
 
     def _step(
         self,

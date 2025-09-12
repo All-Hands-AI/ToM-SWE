@@ -67,6 +67,12 @@ class SearchFileParams(BaseModel):
         le=20,
         description="Maximum number of matching files/sessions to return",
     )
+    chunk_size: int = Field(
+        default=5000,
+        ge=1000,
+        le=10000,
+        description="Chunk size to read from the file. The chunk size is the number of characters to read from the file. Default is 5000 characters.",
+    )
     latest_first: bool = Field(
         default=True,
         description="Return most recent interactions first based on update_time in JSON data",

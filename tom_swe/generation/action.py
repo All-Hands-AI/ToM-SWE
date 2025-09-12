@@ -26,6 +26,7 @@ from tom_swe.generation.dataclass import (
 )
 from tom_swe.memory.locations import (
     get_overall_user_model_filename,
+    get_cleaned_sessions_dir,
     get_cleaned_session_filename,
     get_session_model_filename,
     get_session_models_dir,
@@ -115,19 +116,23 @@ class ActionExecutor:
             return f"Error reading {params.file_path}: {str(e)}"
 
     def _get_content_by_scope(
-        self, search_scope: str, latest_first: bool = True, limit: int = 50
+        self,
+        search_scope: str,
+        latest_first: bool = True,
+        chunk_size: int = 5000,
+        limit: int = 50,
     ) -> List[tuple[str, str]]:
         """Get file content by search scope, optionally sorted by date. Returns list of (file_path, content) tuples."""
         try:
             if search_scope == "cleaned_sessions":
-                files = self.file_store.list(get_cleaned_session_filename(self.user_id))
+                files = self.file_store.list(get_cleaned_sessions_dir(self.user_id))
             elif search_scope == "session_analyses":
                 files = self.file_store.list(get_session_models_dir(self.user_id))
             elif search_scope == "user_profiles":
                 files = [get_overall_user_model_filename(self.user_id)]
             else:
                 files = []
-
+            breakpoint()
             # Read content and prepare for sorting
             file_content_pairs = []
             for file_path in files:
@@ -150,6 +155,16 @@ class ActionExecutor:
                 file_times.sort(key=lambda x: str(x[2]), reverse=True)
                 file_content_pairs = [(f[0], f[1]) for f in file_times]
 
+            if search_scope == "cleaned_sessions":
+                chunked_content_pairs = []
+                for file_path, content in file_content_pairs:
+                    for i in range(0, len(content), chunk_size):
+                        if i == 0:
+                            continue  # we skip the first chunk because it's the system prompt
+                        chunked_content_pairs.append(
+                            (file_path, content[i : i + chunk_size])
+                        )
+                file_content_pairs = chunked_content_pairs
             return file_content_pairs[:limit]
         except Exception:
             return []
@@ -192,7 +207,7 @@ class ActionExecutor:
         try:
             # Use consolidated file loading with date sorting
             file_content_pairs = self._get_content_by_scope(
-                params.search_scope, params.latest_first, 50
+                params.search_scope, params.latest_first, params.chunk_size, 50
             )
 
             # Extract document contents
