@@ -14,12 +14,46 @@ This script:
 
 import json
 import random
+import asyncio
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Iterator
+from typing import List, Dict, Any, Optional, Iterator, Tuple
 import logging
 from datetime import datetime
 
 from datasets import Dataset, load_dataset
+
+# Try to import LLM dependencies
+try:
+    from tom_swe.generation.generate import LLMClient, LLMConfig
+    from pydantic import BaseModel, Field
+    import os
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    LLM_AVAILABLE = True
+
+    # Define VagueStatementResponse inside the try block
+    class VagueStatementResponse(BaseModel):
+        """Pydantic model for LLM response when making statements more vague."""
+
+        modified_statement: str = Field(
+            description="The problem statement rewritten to be more ambiguous/vague while maintaining the user's voice and profile characteristics"
+        )
+        reasoning: str = Field(
+            description="Brief explanation of how the statement was made more vague while reflecting the user profile"
+        )
+
+except ImportError:
+    LLM_AVAILABLE = False
+    print(
+        "⚠️ LLM dependencies not available. Problem statement modification will be skipped."
+    )
+
+    # Define a dummy class when dependencies aren't available
+    class VagueStatementResponse:  # type: ignore[no-redef]
+        pass
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -31,9 +65,31 @@ DATASETS_AVAILABLE = True
 class StatefulSWEDatasetBuilder:
     """Builds the cmu-lti/stateful dataset based on interactive-swe with user profiles."""
 
-    def __init__(self, random_seed: int = 42):
+    def __init__(
+        self,
+        random_seed: int = 42,
+        modify_statements: bool = True,
+        llm_model: str = "gpt-5-2025-08-07",
+    ):
         self.random_seed = random_seed
+        self.modify_statements = modify_statements and LLM_AVAILABLE
+        self.llm_model = llm_model
         random.seed(random_seed)
+
+        # Initialize LLM client if needed
+        if self.modify_statements:
+            api_key = os.getenv("LITELLM_API_KEY")
+            if not api_key:
+                logger.warning(
+                    "No LITELLM_API_KEY found. Problem statement modification will be skipped."
+                )
+                self.modify_statements = False
+            else:
+                llm_config = LLMConfig(
+                    model=self.llm_model,
+                )
+                self.llm_client = LLMClient(llm_config)
+                logger.info(f"LLM client initialized with model: {self.llm_model}")
 
     def load_user_profiles(self, profiles_path: str) -> List[Dict[str, Any]]:
         """Load user profiles from JSONL file."""
@@ -53,19 +109,140 @@ class StatefulSWEDatasetBuilder:
             logger.error(f"User profiles file not found: {profiles_path}")
             return []
 
-    def create_stateful_dataset_generator(
+    async def modify_problem_statement_async(
+        self, problem_statement: str, user_profile: Dict[str, Any]
+    ) -> str:
+        """
+        Modify a problem statement to be more ambiguous/vague while reflecting user profile characteristics.
+
+        Args:
+            problem_statement: Original clear problem statement
+            user_profile: User profile to inform the modification
+
+        Returns:
+            Modified vague problem statement
+        """
+        if not self.modify_statements:
+            return problem_statement
+
+        try:
+            # Extract relevant profile information
+            user_prompt = user_profile.get("user_roleplay_prompt", "")
+
+            # Create prompt for LLM to modify the statement
+            prompt = f"""You are helping to create a more realistic user query by making a technical problem statement sound more ambiguous and vague, as a real user with specific characteristics would phrase it.
+
+USER PROFILE CHARACTERISTICS:
+{user_prompt}
+
+ORIGINAL PROBLEM STATEMENT:
+{problem_statement}
+
+TASK:
+Rewrite this problem statement to be more ambiguous/vague while maintaining the user's voice and profile characteristics. The modified statement should:
+
+1. Sound more like how this specific user would phrase it based on their profile
+2. Be less precise and more ambiguous than the original
+3. Remove specific technical details to the degree that agent has to ask questions/engage with users to finish the task. And do not give any hints about what they should expect agents to behave (e.g., ask questions, etc.)
+4. Use more conversational/informal language if it fits the user profile
+5. Do not leak your preferences in the statement (e.g., tell the swe agent to keep it short), as this should be part of swe agent's job to figure that out.
+6. Use at most 3 sentences. (One sentence is preferred, but you can adjust depending on the user profile)
+7. The problem statement is for swe agent, so do not try to be polite or something. Also do not give agent any guidance about how to finish the task. The goal is for the agent to make follow up engagements with users to finish the task (however, do not tell them to engage with the users, we expect agents to figure that out themselves).
+
+The goal is to make the statement sound more realistic, while staying true to the user's communication style."""
+
+            # Combine system message and user prompt into a single prompt
+            full_prompt = f"""You are an expert at understanding user communication patterns and rewriting technical statements to match specific user profiles.
+
+{prompt}"""
+
+            # Call LLM asynchronously
+            response = await self.llm_client.call_structured_async(
+                prompt=full_prompt, output_type=VagueStatementResponse
+            )
+
+            if response and response.modified_statement:
+                logger.debug(
+                    f"Modified statement: {response.modified_statement[:100]}..."
+                )
+                return response.modified_statement
+            else:
+                logger.warning(
+                    "LLM did not return a modified statement, using original"
+                )
+                return problem_statement
+
+        except Exception as e:
+            logger.warning(f"Failed to modify problem statement: {e}. Using original.")
+            return problem_statement
+
+    async def process_statements_batch(
+        self,
+        statements_and_profiles: List[Tuple[str, Dict[str, Any]]],
+        batch_size: int = 50,
+    ) -> List[str]:
+        """
+        Process multiple problem statements in batches asynchronously.
+
+        Args:
+            statements_and_profiles: List of (statement, profile) tuples
+            batch_size: Number of concurrent LLM calls
+
+        Returns:
+            List of modified statements
+        """
+        if not self.modify_statements:
+            return [stmt for stmt, _ in statements_and_profiles]
+
+        logger.info(
+            f"Modifying {len(statements_and_profiles)} problem statements in batches of {batch_size}"
+        )
+
+        results = []
+        for i in range(0, len(statements_and_profiles), batch_size):
+            batch = statements_and_profiles[i : i + batch_size]
+            logger.info(
+                f"Processing batch {i//batch_size + 1}/{(len(statements_and_profiles) + batch_size - 1)//batch_size}"
+            )
+
+            # Process batch concurrently
+            batch_tasks = [
+                self.modify_problem_statement_async(stmt, profile)
+                for stmt, profile in batch
+            ]
+
+            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+
+            # Handle any exceptions
+            for j, result in enumerate(batch_results):
+                if isinstance(result, Exception):
+                    logger.warning(
+                        f"Error in batch item {i+j}: {result}. Using original statement."
+                    )
+                    results.append(batch[j][0])  # Use original statement
+                else:
+                    results.append(str(result))  # Ensure result is string
+
+        logger.info(f"Successfully modified {len(results)} problem statements")
+        return results
+
+    async def create_stateful_dataset_async(
         self, base_dataset: Any, user_profiles: List[Dict[str, Any]]
-    ) -> Iterator[Dict[str, Any]]:
-        """Generator that yields enriched instances with user profiles.
+    ) -> List[Dict[str, Any]]:
+        """Create enriched instances with user profiles and modified problem statements.
 
         Args:
             base_dataset: The original interactive-swe dataset
             user_profiles: List of user profiles to assign
 
-        Yields:
-            Enriched instances with assigned user profiles
+        Returns:
+            List of enriched instances with assigned user profiles
         """
         profile_counts = {profile["profile_id"]: 0 for profile in user_profiles}
+        instances = []
+
+        # First pass: collect all instances with profiles
+        statements_and_profiles = []
 
         for i, instance in enumerate(base_dataset):
             # Randomly assign a user profile
@@ -95,25 +272,62 @@ class StatefulSWEDatasetBuilder:
                 }
             )
 
-            yield enriched_instance
+            instances.append(enriched_instance)
+
+            # Collect for batch processing if modification is enabled
+            if self.modify_statements:
+                statements_and_profiles.append(
+                    (instance.get("problem_statement", ""), selected_profile)
+                )
+
+        # Modify problem statements in batches if enabled
+        if self.modify_statements and statements_and_profiles:
+            print(
+                "🔄 Modifying problem statements to be more vague and profile-specific..."
+            )
+            modified_statements = await self.process_statements_batch(
+                statements_and_profiles
+            )
+
+            # Update instances with modified statements
+            for i, modified_statement in enumerate(modified_statements):
+                instances[i]["problem_statement"] = modified_statement
 
         # Log final distribution
         print("\n📊 Final profile distribution:")
         for profile_id, count in sorted(profile_counts.items()):
             print(f"  - {profile_id}: {count} instances")
 
-    def build_dataset(
+        return instances
+
+    def create_stateful_dataset_generator(
+        self, instances: List[Dict[str, Any]]
+    ) -> Iterator[Dict[str, Any]]:
+        """Generator that yields enriched instances.
+
+        Args:
+            instances: Pre-processed enriched instances
+
+        Yields:
+            Enriched instances with assigned user profiles
+        """
+        for instance in instances:
+            yield instance
+
+    async def build_dataset_async(
         self,
         profiles_path: str = "data/stateful_swe/user_profiles.jsonl",
         base_dataset_name: str = "cmu-lti/interactive-swe",
         split: str = "test",
+        limit: Optional[int] = None,
     ) -> Optional[Dataset]:
-        """Build the complete stateful dataset.
+        """Build the complete stateful dataset with async problem statement modification.
 
         Args:
             profiles_path: Path to user profiles JSONL file
             base_dataset_name: Name of the base HuggingFace dataset
             split: Dataset split to use
+            limit: Optional limit on number of instances to process
 
         Returns:
             The built Dataset object or None if failed
@@ -135,21 +349,55 @@ class StatefulSWEDatasetBuilder:
         print(f"📥 Loading base dataset: {base_dataset_name} ({split})")
         try:
             base_dataset = load_dataset(base_dataset_name, split=split)
+
+            # Apply limit if specified
+            if limit is not None:
+                print(f"🔢 Limiting to first {limit} instances for testing")
+                base_dataset = base_dataset.select(range(min(limit, len(base_dataset))))
+
             print(f"✅ Loaded {len(base_dataset)} instances from {base_dataset_name}")
         except Exception as e:
             logger.error(f"Failed to load base dataset: {e}")
             return None
 
-        # Create the stateful dataset using generator for memory efficiency
+        # Create enriched instances with async processing
         print("🔄 Creating stateful dataset with profile assignments...")
+        if self.modify_statements:
+            print("🔄 Problem statement modification enabled")
 
+        enriched_instances = await self.create_stateful_dataset_async(
+            base_dataset, user_profiles
+        )
+
+        # Create the stateful dataset from the enriched instances
         stateful_dataset = Dataset.from_generator(
-            lambda: self.create_stateful_dataset_generator(base_dataset, user_profiles)
+            lambda: self.create_stateful_dataset_generator(enriched_instances)
         )
 
         print(f"✅ Built stateful dataset with {len(stateful_dataset)} instances")
 
         return stateful_dataset
+
+    def build_dataset(
+        self,
+        profiles_path: str = "data/stateful_swe/user_profiles.jsonl",
+        base_dataset_name: str = "cmu-lti/interactive-swe",
+        split: str = "test",
+        limit: Optional[int] = None,
+    ) -> Optional[Dataset]:
+        """Build the complete stateful dataset (sync wrapper).
+
+        Args:
+            profiles_path: Path to user profiles JSONL file
+            base_dataset_name: Name of the base HuggingFace dataset
+            split: Dataset split to use
+
+        Returns:
+            The built Dataset object or None if failed
+        """
+        return asyncio.run(
+            self.build_dataset_async(profiles_path, base_dataset_name, split, limit)
+        )
 
     def create_dataset_card(self, num_instances: int, num_profiles: int) -> str:
         """Create a dataset card for the stateful dataset."""
@@ -326,10 +574,16 @@ Created using the ToM-SWE framework for Theory of Mind modeling in software engi
         print(f"💾 Saving dataset locally to: {output_path}")
 
         # Save as parquet (recommended format for HF)
-        dataset.save_to_disk(str(output_path / "dataset"))
+        # dataset.save_to_disk(str(output_path / "dataset"))
 
         # Save as parquet file for direct upload
-        dataset.to_parquet(str(output_path / "test.parquet"))
+        dataset.to_parquet(str(output_path / "test-00000-of-00001.parquet"))
+
+        # Save as JSON for inspection
+        print("💾 Saving dataset as JSON for inspection...")
+        dataset.to_json(
+            str(output_path / "dataset.json"), orient="records", lines=False, indent=2
+        )
 
         # Create and save dataset card
         num_profiles = len(set(dataset["user_profile_id"]))
@@ -353,8 +607,8 @@ Created using the ToM-SWE framework for Theory of Mind modeling in software engi
             json.dump(dataset_info, f, indent=2)
 
         print("✅ Dataset saved locally:")
-        print(f"  - Dataset files: {output_path}/dataset/")
-        print(f"  - Parquet file: {output_path}/test.parquet")
+        print(f"  - Parquet file: {output_path}/test-00000-of-00001.parquet")
+        print(f"  - JSON file: {output_path}/dataset.json")
         print(f"  - Dataset card: {output_path}/README.md")
         print(f"  - Info file: {output_path}/dataset_info.json")
 
@@ -362,6 +616,7 @@ Created using the ToM-SWE framework for Theory of Mind modeling in software engi
         self,
         profiles_path: str = "data/stateful_swe/user_profiles.jsonl",
         output_dir: str = "data/stateful_swe/dataset_for_upload",
+        limit: Optional[int] = None,
     ) -> Optional[Dataset]:
         """Complete pipeline: build and save the stateful dataset.
 
@@ -373,7 +628,7 @@ Created using the ToM-SWE framework for Theory of Mind modeling in software engi
             The built dataset or None if failed
         """
         # Build the dataset
-        dataset = self.build_dataset(profiles_path=profiles_path)
+        dataset = self.build_dataset(profiles_path=profiles_path, limit=limit)
 
         if dataset is None:
             logger.error("Failed to build dataset")
@@ -415,6 +670,27 @@ def main():
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for profile assignment"
     )
+    parser.add_argument(
+        "--modify-statements",
+        action="store_true",
+        help="Enable LLM-based problem statement modification to make them more vague/ambiguous",
+    )
+    parser.add_argument(
+        "--no-modify-statements",
+        action="store_true",
+        help="Disable LLM-based problem statement modification",
+    )
+    parser.add_argument(
+        "--llm-model",
+        default="gpt-5-2025-08-07",
+        help="LLM model to use for problem statement modification",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Limit the number of instances to process (for testing)",
+    )
 
     args = parser.parse_args()
 
@@ -423,10 +699,21 @@ def main():
         print("Install with: pip install datasets huggingface_hub")
         return
 
+    # Determine whether to modify statements
+    modify_statements = True  # Default to enabled
+    if args.no_modify_statements:
+        modify_statements = False
+    elif args.modify_statements:
+        modify_statements = True
+
     # Build the dataset
-    builder = StatefulSWEDatasetBuilder(random_seed=args.seed)
+    builder = StatefulSWEDatasetBuilder(
+        random_seed=args.seed,
+        modify_statements=modify_statements,
+        llm_model=args.llm_model,
+    )
     dataset = builder.build_and_save_complete_dataset(
-        profiles_path=args.profiles_path, output_dir=args.output_dir
+        profiles_path=args.profiles_path, output_dir=args.output_dir, limit=args.limit
     )
 
     if dataset:
