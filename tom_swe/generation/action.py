@@ -132,7 +132,6 @@ class ActionExecutor:
                 files = [get_overall_user_model_filename(self.user_id)]
             else:
                 files = []
-            breakpoint()
             # Read content and prepare for sorting
             file_content_pairs = []
             for file_path in files:
