@@ -17,7 +17,7 @@ import random
 from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
-from datasets import load_from_disk
+from datasets import load_from_disk, Dataset
 
 from tom_swe.tom_agent import ToMAgent, ToMAgentConfig
 from tom_swe.memory.local import LocalFileStore
@@ -29,6 +29,8 @@ class EvalResult:
 
     instance_id: str
     statement_type: str  # "clear" or "unclear"
+    problem_statement: str
+    original_issue: str
     tom_suggestion: str
     suggested_questions: bool  # True if ToM suggested asking questions
     confidence_score: float
@@ -68,11 +70,130 @@ class ClarityEvaluator:
         self.agent = ToMAgent(config)
         print("✅ Agent initialized successfully")
 
+    def _detect_question_suggestion(self, suggestion: str) -> bool:
+        """
+        Sophisticated detection of whether the ToM suggestion recommends asking questions.
+
+        Uses semantic analysis to distinguish between:
+        1. Actually suggesting to ask questions (TRUE positive)
+        2. Mentioning question-related words in other contexts (FALSE positive)
+
+        Args:
+            suggestion: The ToM agent's suggestion text
+
+        Returns:
+            bool: True if the suggestion recommends asking questions
+        """
+        suggestion_lower = suggestion.lower()
+
+        # Patterns that strongly indicate asking questions is recommended
+        question_asking_patterns = [
+            # Direct instructions to ask
+            r"ask\s+(?:for|about|the\s+user|user\s+to)",
+            r"should\s+ask",
+            r"need\s+to\s+ask",
+            r"request\s+(?:more|additional|specific)",
+            r"inquire\s+about",
+            # Suggestions for clarification
+            r"ask\s+for\s+clarification",
+            r"seek\s+clarification",
+            r"request\s+clarification",
+            r"needs?\s+clarification",
+            r"requires?\s+clarification",
+            # Information gathering suggestions
+            r"ask\s+for\s+(?:more|additional)\s+(?:information|details)",
+            r"request\s+(?:more|additional)\s+(?:information|details)",
+            r"need\s+(?:more|additional)\s+(?:information|details)",
+            r"gather\s+(?:more|additional)\s+(?:information|details)",
+            # Specific question suggestions
+            r"ask\s+(?:what|how|when|where|why)",
+            r"question\s+(?:about|regarding)",
+            r"find\s+out\s+(?:what|how|when|where|why)",
+            # Problem identification requiring questions
+            r"(?:unclear|vague|ambiguous|insufficient).*(?:ask|question|clarify)",
+            r"(?:missing|lacks?).*(?:ask|question|request)",
+            r"not\s+enough.*(?:ask|question|request)",
+        ]
+
+        # Check for question-asking patterns
+        import re
+
+        for pattern in question_asking_patterns:
+            if re.search(pattern, suggestion_lower):
+                return True
+
+        # Patterns that indicate the issue is clear/actionable (negative indicators)
+        clear_indicators = [
+            r"(?:clear|actionable|well-defined|specific|detailed|comprehensive)",
+            r"user\s+has\s+provided",
+            r"issue\s+(?:provides|includes|contains)",
+            r"(?:concrete|specific)\s+(?:examples?|code|steps)",
+            r"reproduction\s+steps",
+            r"error\s+messages?",
+            r"no\s+(?:need|reason)\s+(?:to\s+ask|for.*clarification)",
+        ]
+
+        # If suggestion clearly indicates the issue is actionable, it's likely not asking for questions
+        clear_indicator_count = sum(
+            1 for pattern in clear_indicators if re.search(pattern, suggestion_lower)
+        )
+
+        # Simple keyword fallback (but with context awareness)
+        question_keywords = [
+            "ask for",
+            "ask about",
+            "ask the",
+            "ask what",
+            "ask how",
+            "ask when",
+            "ask where",
+            "ask why",
+            "request more",
+            "request additional",
+            "request specific",
+            "needs clarification",
+            "requires clarification",
+            "seek clarification",
+            "more information needed",
+            "additional information",
+            "insufficient information",
+            "unclear about",
+            "vague about",
+            "ambiguous about",
+            "elaborate on",
+            "specify what",
+            "specify how",
+        ]
+
+        keyword_matches = sum(
+            1 for keyword in question_keywords if keyword in suggestion_lower
+        )
+
+        # Decision logic:
+        # - If we found strong question-asking patterns, return True
+        # - If we found many clear indicators but no question patterns, return False
+        # - Use keyword matches as a tiebreaker, but weight against clear indicators
+
+        if keyword_matches > 0:
+            # If there are more clear indicators than keyword matches, likely false positive
+            if clear_indicator_count > keyword_matches:
+                return False
+            return True
+
+        return False
+
     def load_dataset(self) -> List[Dict[str, Any]]:
         """Load and sample the stateful SWE dataset."""
         print(f"📂 Loading dataset from {self.dataset_path}...")
 
-        dataset = load_from_disk(self.dataset_path)
+        # Check if we have a parquet file
+        parquet_file = Path(self.dataset_path) / "test-00000-of-00001.parquet"
+        if parquet_file.exists():
+            print(f"📄 Loading from parquet file: {parquet_file}")
+            dataset = Dataset.from_parquet(str(parquet_file))
+        else:
+            # Try loading from disk as before
+            dataset = load_from_disk(self.dataset_path)
 
         # Convert to list and sample
         all_data = list(dataset)
@@ -82,7 +203,7 @@ class ClarityEvaluator:
         return sampled_data
 
     def evaluate_statement(
-        self, statement: str, statement_type: str, instance_id: str
+        self, statement: str, statement_type: str, original_issue: str, instance_id: str
     ) -> EvalResult:
         """
         Evaluate a single statement for clarity.
@@ -97,11 +218,27 @@ class ClarityEvaluator:
         """
         print(f"🔍 Evaluating {statement_type} statement for {instance_id}...")
 
-        # Create a query simulating SWE agent asking for clarification
-        query = f"I am an SWE agent. I need to understand the user's intent for this issue: {statement}"
+        # Create simple user message format
+        formatted_messages: List[Dict[str, Any]] = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": """<uploaded_files>/workspace/
+</uploaded_files>
 
-        # Format as messages (empty for this evaluation)
-        formatted_messages: List[Dict[str, Any]] = []
+Relevant python code files are in the directory /workspace/.
+DON'T modify the testing logic or any of the tests in any way!
+Also the development Python environment is already set up for you (i.e., all dependencies already installed), so you don't need to install other packages."""
+                        + statement,
+                    }
+                ],
+            }
+        ]
+
+        # Create a query simulating SWE agent asking for guidance
+        query = f"I am an SWE agent. I need to understand the user's intent and expectations for this issue. I need to consult ToM agent about the user's message: {statement}"
 
         try:
             # Get ToM agent suggestion
@@ -121,23 +258,8 @@ class ClarityEvaluator:
                 suggestion = "No recommendation provided"
                 confidence = 0.0
 
-            # Check if ToM suggested asking questions (heuristic)
-            suggested_questions = any(
-                keyword in suggestion.lower()
-                for keyword in [
-                    "ask",
-                    "question",
-                    "clarify",
-                    "clarification",
-                    "unclear",
-                    "vague",
-                    "ambiguous",
-                    "specify",
-                    "detail",
-                    "more information",
-                    "elaborate",
-                ]
-            )
+            # Check if ToM suggested asking questions (sophisticated semantic analysis)
+            suggested_questions = self._detect_question_suggestion(suggestion)
 
             # Determine if classification is correct
             # For unclear statements, ToM should suggest asking questions
@@ -150,6 +272,8 @@ class ClarityEvaluator:
             return EvalResult(
                 instance_id=instance_id,
                 statement_type=statement_type,
+                problem_statement=statement,
+                original_issue=original_issue,
                 tom_suggestion=suggestion,
                 suggested_questions=suggested_questions,
                 confidence_score=confidence,
@@ -161,6 +285,8 @@ class ClarityEvaluator:
             return EvalResult(
                 instance_id=instance_id,
                 statement_type=statement_type,
+                problem_statement=statement,
+                original_issue=statement,
                 tom_suggestion=f"Error: {e}",
                 suggested_questions=False,
                 confidence_score=0.0,
@@ -193,13 +319,13 @@ class ClarityEvaluator:
 
             # Evaluate unclear statement
             unclear_result = self.evaluate_statement(
-                problem_statement, "unclear", f"{instance_id}_unclear"
+                problem_statement, "unclear", original_issue, f"{instance_id}_unclear"
             )
             self.results.append(unclear_result)
 
             # Evaluate clear statement
             clear_result = self.evaluate_statement(
-                original_issue, "clear", f"{instance_id}_clear"
+                original_issue, "clear", original_issue, f"{instance_id}_clear"
             )
             self.results.append(clear_result)
 
@@ -233,12 +359,12 @@ class ClarityEvaluator:
                 {
                     "instance_id": r.instance_id,
                     "statement_type": r.statement_type,
+                    "problem_statement": r.problem_statement,
+                    "original_issue": r.original_issue,
                     "suggested_questions": r.suggested_questions,
                     "confidence_score": r.confidence_score,
                     "correct_classification": r.correct_classification,
-                    "tom_suggestion": r.tom_suggestion[:200] + "..."
-                    if len(r.tom_suggestion) > 200
-                    else r.tom_suggestion,
+                    "tom_suggestion": r.tom_suggestion,
                 }
                 for r in self.results
             ],
@@ -260,11 +386,13 @@ def main():
     """Run the clarity classification evaluation."""
 
     # Configuration
-    dataset_path = "/Users/xuhuizhou/Projects/ToM-SWE/data/stateful_swe/dataset_for_upload_complete/dataset"
+    dataset_path = (
+        "/Users/xuhuizhou/Projects/ToM-SWE/data/stateful_swe/dataset_for_upload"
+    )
     output_path = (
         "/Users/xuhuizhou/Projects/ToM-SWE/stateful_swe/clarity_eval_results.json"
     )
-    num_samples = 5  # Sample 5 data points for testing
+    num_samples = 50  # Sample 5 data points for testing
 
     # Set random seed for reproducibility
     random.seed(42)
