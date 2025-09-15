@@ -55,7 +55,7 @@ class SearchFileParams(BaseModel):
     )
     search_scope: str = Field(
         default="session_analyses",
-        description="Scope of search: 'cleaned_sessions' (raw user interactions), 'session_analyses' (analyzed sessions), 'user_profiles' (overall user models), or 'all'",
+        description="Scope of search: 'cleaned_sessions' (raw user interactions), 'session_analyses' (analyzed sessions), 'user_profiles' (overall user models)",
     )
     search_method: str = Field(
         default="bm25",
