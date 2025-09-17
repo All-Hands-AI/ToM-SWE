@@ -6,7 +6,7 @@ This module contains all Pydantic BaseModel classes used for data validation
 and serialization in the ToM module.
 """
 
-from typing import List, Union, Tuple
+from typing import List, Union
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -41,9 +41,13 @@ class ReadFileParams(BaseModel):
     file_path: str = Field(
         description="Path to the file to read. You are only allowed to read user model related files. "
     )
-    character_range: Tuple[int, int] = Field(
-        default=(5000, 10000),
-        description="Character range to read from the file. The range is inclusive of the start and end characters. Default starts from 5000 since search results would usually give the first 5000 characters of the file.",
+    character_start: int = Field(
+        default=5000,
+        description="Character start to read from the file. Default starts from 5000 since search results would usually give the first 5000 characters of the file.",
+    )
+    character_end: int = Field(
+        default=10000,
+        description="Character end to read from the file. Default ends at 10000.",
     )
 
 

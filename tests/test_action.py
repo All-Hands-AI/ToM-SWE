@@ -114,7 +114,9 @@ def test_read_action_basic() -> None:
     executor = ActionExecutor(user_id="test_user", file_store=mock_file_store)
 
     # Create read parameters with custom character range
-    params = ReadFileParams(file_path="test_file.json", character_range=(0, 25))
+    params = ReadFileParams(
+        file_path="test_file.json", character_start=0, character_end=25
+    )
 
     # Execute read action
     result = executor._action_read_file(params)

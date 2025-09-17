@@ -109,7 +109,7 @@ class ActionExecutor:
         """Read a file."""
         try:
             content = self.file_store.read(params.file_path)[
-                params.character_range[0] : params.character_range[1]
+                params.character_start : params.character_end
             ]
             return content
         except Exception as e:
