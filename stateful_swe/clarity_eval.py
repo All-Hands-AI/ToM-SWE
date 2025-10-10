@@ -392,7 +392,7 @@ def main():
     output_path = (
         "/Users/xuhuizhou/Projects/ToM-SWE/stateful_swe/clarity_eval_results.json"
     )
-    num_samples = 50  # Sample 5 data points for testing
+    num_samples = 50
 
     # Set random seed for reproducibility
     random.seed(42)

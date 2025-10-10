@@ -3,23 +3,30 @@ repos:
     rev: v4.4.0
     hooks:
     -   id: trailing-whitespace
+        exclude: ^stateful_swe/
     -   id: end-of-file-fixer
+        exclude: ^stateful_swe/
     -   id: check-yaml
+        exclude: ^stateful_swe/
     -   id: check-added-large-files
+        exclude: ^stateful_swe/
 
 -   repo: https://github.com/psf/black
     rev: 23.3.0
     hooks:
     -   id: black
+        exclude: ^stateful_swe/
 
 -   repo: https://github.com/astral-sh/ruff-pre-commit
     rev: 'v0.1.15'
     hooks:
     -   id: ruff
         args: [--fix, --exit-non-zero-on-fix]
+        exclude: ^stateful_swe/
 
 -   repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.3.0
     hooks:
     -   id: mypy
         additional_dependencies: [types-requests]
+        exclude: ^stateful_swe/

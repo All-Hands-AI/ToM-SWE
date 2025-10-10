@@ -6,7 +6,7 @@ This module contains all Pydantic BaseModel classes used for data validation
 and serialization in the ToM module.
 """
 
-from typing import List, Union
+from typing import List, Union, Literal
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -259,4 +259,22 @@ class SWEAgentSuggestion(BaseModel):
     )
     confidence_score: float = Field(
         ge=0.0, le=1.0, description="Confidence score for the suggestion quality"
+    )
+
+
+class QueryClassification(BaseModel):
+    """LLM-based classification of SWE agent consultation queries."""
+
+    category: Literal[
+        "code_understanding", "development", "troubleshooting", "other"
+    ] = Field(
+        description="Primary category for the query based on software development workflow"
+    )
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Confidence score for the classification (0.0 = very uncertain, 1.0 = very confident)",
+    )
+    reasoning: str = Field(
+        description="Brief explanation of why this query fits the chosen category"
     )
