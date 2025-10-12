@@ -185,7 +185,6 @@ class ToMAnalyzer:
     async def _auto_update_user_model(self, session_analysis: SessionAnalysis) -> None:
         """Auto-update the overall user model with new session information."""
         try:
-
             # Use LocalFileStore for file operations
             user_model_path = get_overall_user_model_filename(self.user_id)
             user_model_content = self.file_store.read(user_model_path)
