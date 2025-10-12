@@ -1,5 +1,8 @@
 # ToM-SWE
 
+<<<<<<< HEAD
+Theory of Mind package for SWE agents. Provides personalized consultation and guidance for SWE agents through user behavior analysis and a three-tier memory system.
+=======
 Theory of Mind package for SWE agents. Provides personalized instruction improvement and user behavior analysis through a three-tier memory system.
 <img width="984" height="608" alt="image (7)" src="https://github.com/user-attachments/assets/35ae908f-a1a7-4686-9f25-cfd8b98d4717" />
 <img width="984" height="440" alt="image (8)" src="https://github.com/user-attachments/assets/44b82018-3836-4d72-8b5b-aab5020bc680" />
@@ -13,6 +16,7 @@ pip install uv
 uvx --python 3.12 --from git+https://github.com/XuhuiZhou/OpenHands@feature/tom-codeact-agent openhands
 ```
 For details, please refer to the [Google doc](https://docs.google.com/document/d/1P8b1SSF_HYgahK6eO7qSHbOcTv3o3z6SWMH_osyR3_w/edit?usp=sharing)
+>>>>>>> main
 
 ## Quick Start
 
@@ -31,14 +35,14 @@ For details, please refer to the [Google doc](https://docs.google.com/document/d
 
 3. Run example or configure LLM:
    ```bash
-   uv run python example.py           # See instruction improvement in action
+   uv run python example.py           # See consultation functionality in action
    uv run tom-config                  # Interactive LLM setup
    ```
 
 ## Core Features
 
 - **Three-Tier Memory**: Cleaned sessions → Session analyses → User profiles
-- **Instruction Improvement**: Transforms vague instructions into personalized guidance
+- **Agent Consultation**: Provides personalized guidance and recommendations for SWE agents
 - **User Behavior Analysis**: LLM-powered psychological insights and preferences
 - **OpenHands Integration**: Use `TomCodeActAgent` for automatic instruction enhancement
 
@@ -64,7 +68,7 @@ default_agent = "TomCodeActAgent"
 ```
 
 The agent automatically:
-1. Improves user instructions with personalized suggestions
+1. Provides consultation and personalized guidance to SWE agents
 2. Processes user sessions for better understanding
 3. Shows progress during analysis
 

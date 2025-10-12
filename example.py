@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Simple example demonstrating the ToM Agent's propose_instructions function.
+Simple example demonstrating the ToM Agent's consultation functionality.
 
-This script shows how to use the Theory of Mind Agent to improve user instructions
-using real LLM analysis instead of mocks.
+This script shows how to use the Theory of Mind Agent to provide guidance and
+consultation for SWE agents using real LLM analysis instead of mocks.
 
 Requirements:
 - Set up environment: uv run tom-config
@@ -15,6 +15,7 @@ import json
 from dotenv import load_dotenv
 
 from tom_swe.tom_agent import ToMAgent, ToMAgentConfig
+from tom_swe.memory.local import LocalFileStore
 
 # Load environment variables
 load_dotenv()
@@ -32,6 +33,7 @@ def test_sleeptime():
     for file in os.listdir("./data/example_sessions"):
         session_data = json.load(open(f"./data/example_sessions/{file}"))
         sessions_data.append(session_data)
+    sessions_data = sessions_data[:1]
 
     agent = ToMAgent()
     agent.sleeptime_compute(sessions_data)
@@ -43,9 +45,25 @@ def test_sleeptime():
     #     print(f"\n🧹 Cleaned up test data: {test_dir}")
 
 
+def test_pure_rag():
+    """Test Pure RAG baseline mode."""
+    print("🔍 Testing Pure RAG Baseline")
+    print("=" * 30)
+    config = ToMAgentConfig(
+        file_store=LocalFileStore(root="~/.openhands"),
+        llm_model="litellm_proxy/claude-sonnet-4-20250514",
+    )
+    agent = ToMAgent(config)
+    query = "Help me fix a bug"
+
+    # Pure RAG mode
+    result = agent.give_suggestions(query=query, pure_rag=True)
+    print(f"{result.suggestions}")
+
+
 def main():
-    """Demonstrate the propose_instructions function."""
-    print("🤖 ToM Agent - Propose Instructions Example")
+    """Demonstrate the ToM Agent consultation functionality."""
+    print("🤖 ToM Agent - Consultation Example")
     print("=" * 50)
 
     # Check if API key is configured
@@ -56,39 +74,26 @@ def main():
     try:
         # Initialize ToM Agent
         print("\n1. Initializing ToM Agent...")
-        config = ToMAgentConfig()
+        config = ToMAgentConfig(
+            file_store=LocalFileStore(root="~/.openhands"),
+            # llm_model="litellm_proxy/claude-3-7-sonnet-20250219",
+            llm_model="litellm_proxy/claude-sonnet-4-20250514",
+        )
         agent = ToMAgent(config)
         print("✅ Agent initialized successfully")
 
-        # Example instruction to improve
+        # Example instruction for consultation
         user_id = ""  # Use default_user for demo
-        instruction = "Fix my code"
-        context = "User is working on a Python web application"
-
-        print(f"\n2. Testing instruction: '{instruction}'")
-        print(f"   User: {user_id}")
-        print(f"   Context: {context}")
-
-        # Create formatted messages with caching support
-        formatted_messages = [
-            {
-                "role": "system",
-                "content": "You are a helpful assistant.",
-                "cache_control": {"type": "ephemeral"},  # Cache system message
-            },
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": context}],  # Context message
-            },
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": instruction}],  # Main instruction
-            },
-        ]
-
-        # Get improved instructions using new API
-        recommendation = agent.propose_instructions(
+        formatted_messages = []
+        with open("./data/improve_instruction_example/context_swe_interact.jsonl") as f:
+            lines = f.readlines()
+            for line in lines:
+                formatted_messages.append(json.loads(line))
+        instruction = f"I am SWE agent. I need to understand the user's intent and expectations for fixing the Pipeline class issue. I need to consult ToM agent about the user's message: {formatted_messages[-1]['content'][0]['text']}"
+        # Get consultation guidance using ToM API
+        recommendation = agent.give_suggestions(
             user_id=user_id,
+            query=instruction,
             formatted_messages=formatted_messages,
         )
 
@@ -96,7 +101,7 @@ def main():
         if recommendation:
             rec = recommendation
             print(f"   ✅ Confidence: {rec.confidence_score:.0%}")
-            print(f"   📝 Improved instruction:\n{rec.improved_instruction}")
+            print(f"   📝 Consultation guidance:\n{rec.suggestions}")
         else:
             print("   ❌ No recommendations generated")
 
@@ -104,13 +109,16 @@ def main():
 
     except Exception as e:
         print(f"❌ Error: {e}")
-        print("Make sure you have configured your API credentials in the .env file")
 
 
 if __name__ == "__main__":
     # Test the sleeptime function first
-    test_sleeptime()
+    # test_sleeptime()
     # print("\n" + "=" * 50 + "\n")
+
+    # Test pure RAG baseline
+    test_pure_rag()
+    print("\n" + "=" * 50 + "\n")
 
     # Then run the main ToM agent demo
     # main()

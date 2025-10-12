@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 """
-Theory of Mind (ToM) Agent for Personalized Instruction Generation
+Theory of Mind (ToM) Agent for Consultation and Guidance
 
-This module implements a ToM agent that combines user behavior analysis with RAG-based
-context retrieval to propose improved instructions and next actions for individual users.
-The agent uses the existing tom_module for user analysis and rag_module for context
-retrieval to provide personalized guidance.
+This module implements a ToM agent that provides consultation and guidance to SWE agents
+by analyzing user behavior patterns and leveraging RAG-based context retrieval. The agent
+supports both user message analysis and custom agent queries to provide personalized
+guidance based on user mental models.
 
 Key Features:
 1. User context analysis using existing mental state models
 2. RAG-based retrieval of relevant user behavior patterns
-3. Personalized instruction generation based on user preferences
-4. Next action recommendations tailored to user's mental state
-5. Integration with existing ToM and RAG infrastructure
+3. Bidirectional consultation supporting user queries and agent questions
+4. Personalized guidance generation based on user preferences and history
+5. Flexible consultation framework for various SWE agent needs
+6. Integration with existing ToM and RAG infrastructure
 """
 
 import logging
 import os
 import json
-import time
 import asyncio
 from dataclasses import dataclass
 from typing import Any, List, Optional, Dict
@@ -29,10 +29,11 @@ from dotenv import load_dotenv
 
 # Local imports
 from tom_swe.generation.dataclass import (
-    InstructionImprovement,
-    ClarityAssessment,
+    SWEAgentSuggestion,
     AnalyzeSessionParams,
     InitializeUserProfileParams,
+    GenerateSuggestionsParams,
+    SearchFileParams,
 )
 from tom_swe.generation import (
     LLMConfig,
@@ -41,10 +42,9 @@ from tom_swe.generation import (
     ActionResponse,
     ActionExecutor,
 )
-from tom_swe.prompts import PROMPTS
-from tom_swe.rag_module import RAGAgent, create_rag_agent
+from tom_swe.prompts.manager import render_prompt
 from tom_swe.tom_module import ToMAnalyzer
-from tom_swe.memory.conversation_processor import clean_sessions
+from tom_swe.memory.conversation_processor import clean_sessions, _clean_user_message
 from tom_swe.memory.local import LocalFileStore
 from tom_swe.memory.locations import (
     get_cleaned_session_filename,
@@ -53,7 +53,7 @@ from tom_swe.memory.locations import (
     get_session_model_filename,
 )
 from tom_swe.memory.store import FileStore, load_user_model
-from tom_swe.utils import format_proposed_instruction
+from tom_swe.utils import format_proposed_suggestions
 
 # Load environment variables
 load_dotenv()
@@ -73,9 +73,7 @@ except ImportError:
 litellm.set_verbose = False
 
 # LLM configuration
-DEFAULT_LLM_MODEL = os.getenv(
-    "DEFAULT_LLM_MODEL", "litellm_proxy/claude-sonnet-4-20250514"
-)
+DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "litellm_proxy/gpt-5-2025-04-16")
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
 LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
 
@@ -122,7 +120,7 @@ class ToMAgent:
         # LLM configuration - use config values if provided, otherwise fallback to env vars
         self.api_key = config.api_key or LITELLM_API_KEY
         self.api_base = config.api_base or LITELLM_BASE_URL
-        self.file_store = config.file_store or LocalFileStore(root="~/.openhands")
+        self.file_store = config.file_store or LocalFileStore(root="~/data")
 
         # Create LLM client with our configuration
         llm_config = LLMConfig(
@@ -135,11 +133,9 @@ class ToMAgent:
         # Initialize ToM analyzer with LLM client and FileStore
         self.tom_analyzer = ToMAnalyzer(
             llm_client=self.llm_client,
+            file_store=self.file_store,  # type: ignore[arg-type]
             user_id="",  # Default to empty string as per the new API
         )
-
-        # RAG agent will be initialized when needed (only if RAG is enabled)
-        self._rag_agent: Optional[RAGAgent] = None
 
         # Initialize action executor with reference to this agent
         self.action_executor = ActionExecutor(
@@ -151,22 +147,30 @@ class ToMAgent:
             f"ToM Agent initialized with model: {self.llm_model}, RAG: {rag_status}"
         )
 
-    def propose_instructions(
+    def give_suggestions(
         self,
         user_id: str | None = "",
+        query: str = "",
         formatted_messages: List[Dict[str, Any]] | None = None,
-    ) -> InstructionImprovement | None:
+        pure_rag: bool = False,
+    ) -> SWEAgentSuggestion | None:
         """
-        Propose improved instructions using workflow controller.
+        Provide consultation and guidance using workflow controller.
+
+        This function serves as the main consultation interface, supporting both user message
+        analysis and custom agent queries. It leverages user modeling and conversation context
+        to provide personalized guidance.
 
         Args:
-            user_id: The user ID to analyze and generate instructions for
+            user_id: The user ID to analyze and generate guidance for
+            query: The original instruction/query to analyze
             formatted_messages: List of formatted message dicts with cache support
+            pure_rag: If True, use simple RAG baseline without ToM analysis
 
         Returns:
-            Instruction recommendation
+            Consultation guidance and recommendations based on user modeling
         """
-        logger.info(f"🎯 Proposing instructions for user {user_id}")
+        logger.info("🎯 Providing consultation for SWE agent")
         if user_id is None:
             user_id = ""
         assert isinstance(
@@ -175,195 +179,136 @@ class ToMAgent:
 
         # Update the action executor's user_id
         self.action_executor.user_id = user_id
+
+        # Clean original instruction to remove system tags for both modes
+        cleaned_query = _clean_user_message(query)
+
+        # Pure RAG baseline mode - skip complex ToM analysis
+        if pure_rag:
+            logger.info("🔍 Using Pure RAG baseline mode")
+
+            # Use existing BM25 search infrastructure directly
+            search_params = SearchFileParams(
+                query=cleaned_query,
+                search_scope="cleaned_sessions",  # Search all cleaned sessions
+                max_results=3,
+                chunk_size=1000,
+                latest_first=True,
+            )
+            try:
+                search_results = self.action_executor._action_search_file(search_params)
+                return SWEAgentSuggestion(
+                    original_query=cleaned_query,
+                    suggestions=format_proposed_suggestions(
+                        query=cleaned_query,
+                        suggestions=search_results,
+                        confidence_score=0.5,
+                    ),
+                    confidence_score=0.5,  # Medium confidence since it's just retrieval
+                )
+            except Exception as e:
+                logger.warning(f"Pure RAG search failed: {e}")
+                return SWEAgentSuggestion(
+                    original_query=cleaned_query,
+                    suggestions="Pure RAG search failed. No conversation history available.",
+                    confidence_score=0.1,
+                )
         # Build comprehensive prompt for instruction improvement
         user_model = load_user_model(user_id, self.file_store)
 
         # Ensure formatted_messages is not None
         if formatted_messages is None:
             formatted_messages = []
-        # Early stop: Quick clarity assessment for caching optimization
-        logger.info("🔍 Performing early clarity assessment")
+
+        # Clean user messages in formatted_messages (following tom_module logic)
+        cleaned_formatted_messages = []
+        for index, message in enumerate(formatted_messages):
+            # Clean user messages
+            if message.get("role") == "user":
+                content = message.get("content", "")
+
+                # Handle both string and list content formats
+                if isinstance(content, list):
+                    # Extract text from content blocks (like Claude API format)
+                    text_content = ""
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            text_content += block.get("text", "")
+                        elif isinstance(block, str):
+                            text_content += block
+                    content = text_content
+                elif not isinstance(content, str):
+                    content = str(content)
+
+                cleaned_content = _clean_user_message(content)
+                if cleaned_content.strip():  # Only keep non-empty messages
+                    cleaned_message = message.copy()
+                    cleaned_message["content"] = cleaned_content
+                    cleaned_formatted_messages.append(cleaned_message)
+            else:
+                # Keep non-user messages as is
+                cleaned_formatted_messages.append(message)
+        # Early stop: Quick consultation assessment for caching optimization
+        logger.info("🔍 Performing consultation assessment")
         propose_instructions_messages: List[Dict[str, Any]] = (
             [
                 {
                     "role": "system",
-                    "content": PROMPTS["propose_instructions"],
+                    "content": render_prompt("give_suggestions"),
                     "cache_control": {"type": "ephemeral"},  # Cache the system prompt
                 }
             ]
             + [
                 {
                     "role": "user",
-                    "content": f"Here is the content of the overall_user_model (`overall_user_model.json`): {user_model}",
+                    "content": f"Here is the content of the overall_user_model (`overall_user_model.json`): {user_model}\n Below is the agent-user interaction context:\n-------------context start-------------",
                 }
             ]
-            + formatted_messages
+            + cleaned_formatted_messages
+            + [
+                {
+                    "role": "user",
+                    "content": f"-------------context end-------------\n Here is <SWE_agent_query>: {cleaned_query}\n",
+                }
+            ]
         )
         assert (
             propose_instructions_messages[-1]["role"] == "user"
         ), "Last message must be a user message"
 
-        # Extract original instruction text from all consecutive user messages from the end
-        def extract_text_from_content(content: str | list[dict[str, Any]]) -> str:
-            """Extract text from message content (handles both string and structured content)."""
-            if isinstance(content, list):
-                # Handle structured content (text/image)
-                text_parts = [
-                    c.get("text", "") for c in content if c.get("type") == "text"
-                ]
-                return " ".join(text_parts)
-            else:
-                # Handle simple string content
-                return str(content)
-
-        # Collect all consecutive user messages from the end
-        propose_instructions_messages.append(
-            {
-                "role": "user",
-                "content": f"Here is the my original instruction: {formatted_messages[-1]['content']}\n Now I want you to role-play as me and improve the instruction.",
-            }
-        )
-        user_messages: list[str] = []
-        for i in range(len(propose_instructions_messages) - 1, -1, -1):
-            message = propose_instructions_messages[i]
-            if message["role"] == "user":
-                text = extract_text_from_content(message["content"])
-                user_messages.insert(0, text)  # Insert at beginning to maintain order
-            else:
-                break  # Stop when we hit a non-user message
-
-        original_instruction = " ".join(user_messages)
         try:
-            clarity_result = self.llm_client.call_structured_messages(
+            result = self._step(
                 messages=propose_instructions_messages,
-                output_type=ClarityAssessment,
-                temperature=0.1,
             )
-
-            # Early stop if clarity is sufficient
-            if clarity_result and clarity_result.is_clear:
-                logger.info(
-                    f"✅ Early stop: Intent is clear - {clarity_result.reasoning}"
-                )
-                # Return minimal improvement for clear instructions
-                return None
-            else:
-                logger.info(
-                    f"🔄 Proceeding with full workflow - {clarity_result.reasoning if clarity_result else 'unknown'}"
-                )
-                # Use workflow controller with final structured output
-                propose_instructions_messages.append(
-                    {
-                        "role": "assistant",
-                        "content": f"Clarity assessment: {clarity_result.reasoning} (The instruction is clear: {clarity_result.is_clear})",
-                    }
-                )
-                result = self._step(
-                    messages=propose_instructions_messages,
-                )
         except Exception as e:
             logger.warning(f"Clarity assessment failed: {e}, exit")
             return None
 
-        # Post-process the instruction with formatted output
-        final_instruction = format_proposed_instruction(
-            original_instruction=original_instruction,
-            improved_instruction=result.improved_instruction,
+        # Post-process the suggestions with formatted output
+        if not isinstance(result, GenerateSuggestionsParams):
+            logger.warning(
+                f"Workflow didn't complete properly. Got {type(result)}: {result}"
+            )
+            if isinstance(result, str) and result.strip():
+                fallback_suggestions = f"Workflow incomplete. Last result: {result}"
+            else:
+                fallback_suggestions = "Unable to generate suggestions due to workflow failure. Please try again or contact support."
+            result = GenerateSuggestionsParams(
+                suggestions=fallback_suggestions,
+                confidence_score=0.0,
+            )
+
+        final_suggestions = format_proposed_suggestions(
+            query=cleaned_query,
+            suggestions=result.suggestions,
             confidence_score=result.confidence_score,
         )
 
-        return InstructionImprovement(
-            original_instruction=original_instruction,
-            improved_instruction=final_instruction,
+        return SWEAgentSuggestion(
+            original_query=cleaned_query,
+            suggestions=final_suggestions,
             confidence_score=result.confidence_score,
         )
-
-    def _get_relevant_behavior_sync(self, original_instruction: str) -> str:
-        """Get relevant user behavior from RAG if enabled (synchronous)."""
-        if not self.enable_rag:
-            return "RAG disabled - using user context only"
-
-        rag_start_time = time.time()
-        logger.info("⏱️  Starting RAG retrieval for instruction improvement...")
-
-        rag_agent = self._get_rag_module_sync()
-        rag_init_time = time.time()
-        logger.info(
-            f"⏱️  RAG agent initialization: {rag_init_time - rag_start_time:.2f}s"
-        )
-
-        # Build direct query for user message search
-        rag_query = original_instruction  # Search directly against user messages
-
-        # Log the query content and token count
-        query_tokens = len(rag_query.split()) * 1.3  # Rough estimate
-        logger.info("🔍 RAG QUERY DEBUG:")
-        logger.info(f"  - Query: '{rag_query}'")
-        logger.info(f"  - Query length: {len(rag_query)} characters")
-        logger.info(f"  - Estimated tokens: ~{query_tokens:.0f}")
-
-        # Retrieve relevant user behavior (retrieval only, no generation)
-        query_start_time = time.time()
-        retrieved_docs = rag_agent.retrieve(rag_query, k=5)
-        query_end_time = time.time()
-
-        # Extract content from retrieved documents (now user messages with context)
-        behavior_parts = []
-        for i, doc in enumerate(retrieved_docs[:3]):  # Use top 3 for context
-            # Format user message with surrounding context
-            user_msg = doc.content
-            metadata = doc.metadata
-
-            # Build context string
-            context_parts = [f"User msg: {user_msg}"]
-
-            # Add session context if available
-            if metadata.get("session_title"):
-                context_parts.append(f"Session: {metadata['session_title']}")
-            if metadata.get("repository_context"):
-                context_parts.append(f"Project: {metadata['repository_context']}")
-
-            # Add surrounding context (now a string)
-            surrounding = metadata.get("surrounding_context", "")
-            if surrounding:
-                context_parts.append(f"Context: {surrounding}")
-
-            behavior_parts.append(f"Context {i+1}:\n" + "\n".join(context_parts))
-
-        relevant_behavior = (
-            "\n\n".join(behavior_parts)
-            if behavior_parts
-            else "No relevant patterns found"
-        )
-
-        total_rag_time = query_end_time - rag_start_time
-        query_time = query_end_time - query_start_time
-        logger.info(f"⏱️  RAG query execution: {query_time:.2f}s")
-        logger.info(f"⏱️  Total RAG time for instructions: {total_rag_time:.2f}s")
-
-        return relevant_behavior
-
-    def _get_rag_module_sync(self) -> RAGAgent:
-        """Get or initialize the RAG agent (synchronous)."""
-        if self._rag_agent is None:
-            logger.info("Initializing RAG agent...")
-            try:
-                loop = asyncio.get_running_loop()
-                self._rag_agent = asyncio.run_coroutine_threadsafe(
-                    create_rag_agent(
-                        llm_model=self.llm_model,
-                    ),
-                    loop,
-                ).result()
-            except RuntimeError:
-                # No event loop running
-                self._rag_agent = asyncio.run(
-                    create_rag_agent(
-                        llm_model=self.llm_model,
-                    )
-                )
-            logger.info("RAG agent initialized successfully")
-        return self._rag_agent
 
     def _step(
         self,
@@ -387,6 +332,12 @@ class ToMAgent:
 
         logger.info(f"🤖 Starting workflow with {max_iterations} max iterations")
         logger.debug(f"Initial messages: {messages}")
+        messages.append(
+            {
+                "role": "user",
+                "content": f"Please be aware that you only have {max_iterations} iterations/actions to complete the task. You should use the iterations/actions wisely.",
+            }
+        )
 
         for iteration in range(max_iterations):
             logger.info(f"🔄 Workflow iteration {iteration + 1}/{max_iterations}")
@@ -398,7 +349,7 @@ class ToMAgent:
             else:
                 # Structured call with Pydantic model for intermediate steps
                 response = self.llm_client.call_structured_messages(
-                    messages=messages, output_type=response_model, temperature=0.1
+                    messages=messages, output_type=response_model
                 )
 
             if not response:
@@ -409,7 +360,6 @@ class ToMAgent:
             logger.log(CLI_DISPLAY_LEVEL, f"🧠 Agent reasoning: {response.reasoning}")
             logger.log(CLI_DISPLAY_LEVEL, f"⚡ Agent action: {response.action.value}")
             logger.log(CLI_DISPLAY_LEVEL, f"🔍 Action parameters: {response.parameters}")
-
             # Execute the action using ActionExecutor
             result = self.action_executor.execute_action(
                 response.action, response.parameters
@@ -482,29 +432,33 @@ class ToMAgent:
             ]
             # remove empty strings
             cleaned_session_ids = [x for x in cleaned_session_ids if x]
-
-            # rank the cleaned_session_ids; the last id is the most recent session
-            def get_last_updated(session_id: str) -> str:
-                session_data = json.loads(
-                    self.file_store.read(
-                        get_cleaned_session_filename(session_id, user_id)
-                    )
-                )
-                return str(session_data.get("last_updated", ""))
-
-            cleaned_session_ids = sorted(cleaned_session_ids, key=get_last_updated)
         except FileNotFoundError:
             # No cleaned sessions directory exists yet
             cleaned_session_ids = []
             return
-        # Find sessions that don't have corresponding model files
-        unprocessed_sessions = [
-            cleaned_session_ids[-1]
-        ]  # always process the most recent session as we don't know whether such session is updated.
-        for session_id in cleaned_session_ids[:-1]:
+        # Find sessions that need reprocessing based on timestamp comparison
+        unprocessed_sessions = []
+        for session_id in cleaned_session_ids:
             model_file = get_session_model_filename(session_id, user_id)
+
+            # Get cleaned session timestamp
+            cleaned_session_data = json.loads(
+                self.file_store.read(get_cleaned_session_filename(session_id, user_id))
+            )
+            cleaned_last_updated = cleaned_session_data.get("last_updated", "")
+
             if not self.file_store.exists(model_file):
+                # No model file exists - needs processing
                 unprocessed_sessions.append(session_id)
+            else:
+                # Model file exists - check if cleaned session is newer
+                model_data = json.loads(self.file_store.read(model_file))
+                model_last_updated = model_data.get("last_updated", "")
+
+                if cleaned_last_updated > model_last_updated:
+                    # Cleaned session is newer - needs reprocessing
+                    unprocessed_sessions.append(session_id)
+
         logger.info(f"🔍 Unprocessed sessions: {unprocessed_sessions}")
 
         preset_actions = []
@@ -540,7 +494,7 @@ class ToMAgent:
         user_model = load_user_model(user_id, self.file_store)
         # Step 4: Use workflow controller with preset actions
         messages = [
-            {"role": "system", "content": PROMPTS["sleeptime_compute"]},
+            {"role": "system", "content": render_prompt("sleeptime_compute")},
             {
                 "role": "user",
                 "content": f"Here is the content of the user model (`overall_user_model.json`): {user_model}\nI have {len(unprocessed_sessions)} unprocessed session files that need batch processing:\nSession IDs to process: {unprocessed_sessions}.",
@@ -559,7 +513,7 @@ def create_tom_agent(
     llm_model: Optional[str] = None,
     api_key: Optional[str] = None,
     api_base: Optional[str] = None,
-    enable_rag: bool = True,
+    enable_rag: bool = False,
     file_store: Optional[FileStore] = None,
     skip_memory_collection: bool = False,
 ) -> ToMAgent:

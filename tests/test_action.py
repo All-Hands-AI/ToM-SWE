@@ -5,7 +5,7 @@ Simple tests for the action module.
 import pytest
 from unittest.mock import Mock
 from tom_swe.generation.action import ActionExecutor
-from tom_swe.generation.dataclass import SearchFileParams
+from tom_swe.generation.dataclass import SearchFileParams, ReadFileParams
 
 
 def test_search_action_basic() -> None:
@@ -101,6 +101,32 @@ def test_bm25_search() -> None:
     assert (
         "file1.json" in first_file_line
     ), f"file1.json should be first, but first line is: {first_file_line}"
+
+
+def test_read_action_basic() -> None:
+    """Test basic read action functionality."""
+    # Create mock file store
+    mock_file_store = Mock()
+    test_content = "This is a test file content with some data that we want to read."
+    mock_file_store.read.return_value = test_content
+
+    # Create action executor
+    executor = ActionExecutor(user_id="test_user", file_store=mock_file_store)
+
+    # Create read parameters with custom character range
+    params = ReadFileParams(
+        file_path="test_file.json", character_start=0, character_end=25
+    )
+
+    # Execute read action
+    result = executor._action_read_file(params)
+
+    # Verify file store read was called correctly
+    mock_file_store.read.assert_called_once_with("test_file.json")
+
+    # Verify the correct character range was extracted
+    expected_result = test_content[0:25]  # "This is a test file cont"
+    assert result == expected_result
 
 
 if __name__ == "__main__":

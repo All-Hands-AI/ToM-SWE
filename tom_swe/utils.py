@@ -112,20 +112,20 @@ def debug_large_prompt(
         logger.info("  - Full prompt saved to /tmp/large_prompt_debug.txt")
 
 
-def format_proposed_instruction(
-    original_instruction: str,
-    improved_instruction: str,
+def format_proposed_suggestions(
+    query: str,
+    suggestions: str,
     confidence_score: float,
 ) -> str:
-    final_instruction = f"""The user's original message was: '{original_instruction}'
+    final_instruction = f"""
+Based on the conversation context and user patterns, here's a suggestion to help swe agent better understand and help the user:
 *****************ToM Agent Analysis Start Here*****************
-Based on the conversation context and user patterns, here's a suggestion to help you better understand and help the user:
+💡 Suggestion for SWE Agent (IMPORTANT!)
+{suggestions}
 
-## Improved Instruction (IMPORTANT!)
-{improved_instruction}
-
-## Confidence in the improved instruction
-The ToM agent is {confidence_score*100:.0f}% confident in the improved instruction.
+💡 Confidence in the guidance
+The ToM agent is {confidence_score*100:.0f}% confident in this suggestion for SWE agent.
+*****************ToM Agent Analysis End Here*****************
 """
 
     return final_instruction

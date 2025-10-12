@@ -1,10 +1,10 @@
 """
 Centralized prompt management for ToM Agent workflows.
 
-This module provides a single source of truth for all system prompts
+This module provides a Jinja2-based template system for all system prompts
 used across different ToM Agent workflows.
 """
 
-from .registry import PROMPTS
+from .manager import PromptManager, get_prompt_manager, render_prompt
 
-__all__ = ["PROMPTS"]
+__all__ = ["PromptManager", "get_prompt_manager", "render_prompt"]

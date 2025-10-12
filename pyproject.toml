@@ -23,6 +23,8 @@ dependencies = [
     "typing-extensions>=4.0.0",
     "tqdm>=4.65.0",
     "aiofiles>=23.0.0",
+    # Template engine
+    "jinja2>=3.0.0",
     # API dependencies
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
@@ -30,6 +32,10 @@ dependencies = [
     # BM25 search dependencies
     "bm25s>=0.2.0",
     "PyStemmer>=2.2.0",
+    "tiktoken>=0.8.0",
+    # HuggingFace dependencies
+    "datasets>=2.0.0",
+    "huggingface_hub>=0.0.0",
 ]
 
 [project.optional-dependencies]

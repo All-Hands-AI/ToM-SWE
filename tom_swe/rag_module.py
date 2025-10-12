@@ -26,7 +26,7 @@ import numpy as np
 from dotenv import load_dotenv
 from litellm import completion, embedding
 from tqdm import tqdm
-from tom_swe.prompts import PROMPTS
+from tom_swe.prompts.manager import render_prompt
 
 # Token counting
 try:
@@ -730,15 +730,14 @@ class VectorDB:
             Condensed content or None if condensation fails
         """
         try:
-            prompt = PROMPTS["message_condensation"].format(
-                max_tokens=max_tokens, content=content
+            prompt = render_prompt(
+                "message_condensation", max_tokens=max_tokens, content=content
             )
 
             # Use efficient model for condensation
             response = completion(
                 model="gpt-4o-mini",  # Fast and cost-effective
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.1,  # Low temperature for consistent condensation
                 max_tokens=max_tokens + 50,  # Buffer for response formatting
             )
 

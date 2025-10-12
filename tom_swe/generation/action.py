@@ -19,19 +19,19 @@ from tom_swe.generation.dataclass import (
     UpdateJsonFieldParams,
     AnalyzeSessionParams,
     InitializeUserProfileParams,
-    GenerateInstructionImprovementParams,
+    GenerateSuggestionsParams,
     GenerateSleepSummaryParams,
     RagSearchParams,
     SessionAnalysis,
 )
 from tom_swe.memory.locations import (
     get_overall_user_model_filename,
+    get_cleaned_sessions_dir,
     get_cleaned_session_filename,
     get_session_model_filename,
     get_session_models_dir,
 )
 from tom_swe.memory.store import FileStore
-from tom_swe.memory.local import LocalFileStore
 
 try:
     from tom_swe.logging_config import get_tom_swe_logger
@@ -48,8 +48,8 @@ class ActionExecutor:
     def __init__(
         self,
         user_id: str,
+        file_store: FileStore,
         agent_context: Optional[Any] = None,
-        file_store: Optional[FileStore] = None,
     ):
         """
         Initialize the action executor.
@@ -59,12 +59,12 @@ class ActionExecutor:
             file_store: FileStore for I/O operations
         """
         self.agent_context = agent_context
-        self.file_store = file_store or LocalFileStore(root="~/.openhands")
+        self.file_store = file_store
         self.user_id = user_id
 
     def execute_action(
         self, action: ActionType, parameters: Any
-    ) -> str | GenerateInstructionImprovementParams | GenerateSleepSummaryParams:
+    ) -> str | GenerateSuggestionsParams | GenerateSleepSummaryParams:
         """
         Execute a specific action with given parameters.
 
@@ -79,11 +79,9 @@ class ActionExecutor:
         logger.info(f"📋 Parameters: {parameters}")
 
         # Handle final response actions - these contain the response data in parameters
-        if action == ActionType.GENERATE_INSTRUCTION_IMPROVEMENT:
-            logger.info(
-                "📤 Final response action: returning instruction improvement data"
-            )
-            assert isinstance(parameters, GenerateInstructionImprovementParams)
+        if action == ActionType.GENERATE_SUGGESTIONS:
+            logger.info("📤 Final response action: returning suggestions data")
+            assert isinstance(parameters, GenerateSuggestionsParams)
             return parameters  # Return the structured response data directly
         elif action == ActionType.GENERATE_SLEEP_SUMMARY:
             logger.info("📤 Final response action: returning sleep summary data")
@@ -110,25 +108,30 @@ class ActionExecutor:
     def _action_read_file(self, params: ReadFileParams) -> str:
         """Read a file."""
         try:
-            content = self.file_store.read(params.file_path)
+            content = self.file_store.read(params.file_path)[
+                params.character_start : params.character_end
+            ]
             return content
         except Exception as e:
             return f"Error reading {params.file_path}: {str(e)}"
 
     def _get_content_by_scope(
-        self, search_scope: str, latest_first: bool = True, limit: int = 50
+        self,
+        search_scope: str,
+        latest_first: bool = True,
+        chunk_size: int = 5000,
+        limit: int = 50,
     ) -> List[tuple[str, str]]:
         """Get file content by search scope, optionally sorted by date. Returns list of (file_path, content) tuples."""
         try:
             if search_scope == "cleaned_sessions":
-                files = self.file_store.list(get_cleaned_session_filename(self.user_id))
+                files = self.file_store.list(get_cleaned_sessions_dir(self.user_id))
             elif search_scope == "session_analyses":
                 files = self.file_store.list(get_session_models_dir(self.user_id))
             elif search_scope == "user_profiles":
                 files = [get_overall_user_model_filename(self.user_id)]
             else:
                 files = []
-
             # Read content and prepare for sorting
             file_content_pairs = []
             for file_path in files:
@@ -151,6 +154,16 @@ class ActionExecutor:
                 file_times.sort(key=lambda x: str(x[2]), reverse=True)
                 file_content_pairs = [(f[0], f[1]) for f in file_times]
 
+            if search_scope == "cleaned_sessions":
+                chunked_content_pairs = []
+                for file_path, content in file_content_pairs:
+                    for i in range(0, len(content), chunk_size):
+                        if i == 0:
+                            continue  # we skip the first chunk because it's the system prompt
+                        chunked_content_pairs.append(
+                            (file_path, content[i : i + chunk_size])
+                        )
+                file_content_pairs = chunked_content_pairs
             return file_content_pairs[:limit]
         except Exception:
             return []
@@ -193,7 +206,7 @@ class ActionExecutor:
         try:
             # Use consolidated file loading with date sorting
             file_content_pairs = self._get_content_by_scope(
-                params.search_scope, params.latest_first, 50
+                params.search_scope, params.latest_first, params.chunk_size, 50
             )
 
             # Extract document contents
@@ -231,7 +244,7 @@ class ActionExecutor:
 
                 # Get relevant snippet
                 content = corpus[doc_idx]
-                snippet = content[:10000] + "..." if len(content) > 10000 else content
+                snippet = content[:5000] + "..." if len(content) > 5000 else content
 
                 formatted_results.append(
                     f"[Score: {score:.2f}] {file_path}:\n{snippet}"
@@ -293,17 +306,15 @@ class ActionExecutor:
                         # Remove by value
                         if params.new_value in old_value:
                             old_value.remove(params.new_value)
-                result_value = old_value
             else:
                 # Default: replace the field
                 current[final_field] = params.new_value
-                result_value = params.new_value
 
             # Write back
             data["last_updated"] = datetime.now().isoformat()
             self.file_store.write(field_path, json.dumps(data, indent=2))
 
-            return f"Updated {field_path}: {old_value} → {result_value}"
+            return f"Updated {field_path}: {params.list_operation} {params.new_value}"
 
         except Exception as e:
             return f"Update error: {str(e)}"

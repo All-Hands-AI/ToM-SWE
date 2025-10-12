@@ -86,7 +86,6 @@ class EnhancedUserBehaviorAnalyzer:
             completion_args = {
                 "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.3,
             }
 
             if LITELLM_API_KEY:

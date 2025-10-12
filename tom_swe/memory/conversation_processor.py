@@ -8,7 +8,6 @@ from dataclasses import dataclass, asdict
 from typing import Dict, List, Any, Optional, Callable, TypeVar
 from .store import UserModelStore
 from .locations import get_cleaned_session_filename
-from .local import LocalFileStore
 from datetime import datetime
 
 T = TypeVar("T")
@@ -36,7 +35,7 @@ class CleanSession:
 
 
 def _clean_user_message(content: str) -> str:
-    """Remove system tags from user message."""
+    """Remove system tags and templates from user message."""
     patterns = [
         r"<REPOSITORY_INFO>.*?</REPOSITORY_INFO>",
         r"<RUNTIME_INFORMATION>.*?</RUNTIME_INFORMATION>",
@@ -44,6 +43,8 @@ def _clean_user_message(content: str) -> str:
         r"<ENVIRONMENT>.*?</ENVIRONMENT>",
         r"<CONTEXT>.*?</CONTEXT>",
         r"<system-reminder>.*?</system-reminder>",
+        # Remove phase-based template that starts with "Follow these phases to resolve the issue:"
+        r"Follow these phases to resolve the issue:.*?(?=\n\n(?![0-9]+\.|Phase [0-9]+\.)|$)",
     ]
 
     cleaned = content
@@ -58,7 +59,7 @@ def _is_important_user_message(original: str, cleaned: str) -> bool:
     if not cleaned.strip():
         return False
 
-    if len(cleaned) < 25:  # Too short
+    if len(cleaned) < 10:  # Too short
         return False
 
     if len(cleaned) < len(original) * 0.3:  # Mostly system content
@@ -122,7 +123,7 @@ def clean_sessions(
 
         # Create CleanSessionStore for this session
         store = CleanSessionStore(
-            file_store=file_store or LocalFileStore(root="~/.openhands"),
+            file_store=file_store,
             clean_session=clean_session,
         )
 
@@ -181,8 +182,6 @@ class CleanSessionStore(UserModelStore):
     ) -> "CleanSessionStore":
         """Get a clean session store instance."""
         file_store = getattr(config, "file_store", None) if config else None
-        if not file_store:
-            file_store = LocalFileStore("~/.openhands")
         # Need a clean_session - this would be provided differently
         clean_session = CleanSession(
             session_id="", start_time="", end_time="", messages=[]
