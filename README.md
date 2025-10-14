@@ -6,8 +6,10 @@
 <div align="center">
 
 [![pypi](https://img.shields.io/pypi/v/tom-swe.svg)](https://pypi.python.org/pypi/tom-swe)
-[![versions](https://img.shields.io/pypi/pyversions/tom-swe.svg)](https://github.com/XuhuiZhou/ToM-SWE)
-[![CI](https://img.shields.io/github/actions/workflow/status/XuhuiZhou/ToM-SWE/tests.yml?branch=main&logo=github&label=CI)](https://github.com/XuhuiZhou/ToM-SWE/actions?query=branch%3Amain)
+[![versions](https://img.shields.io/pypi/pyversions/tom-swe.svg)](https://github.com/All-Hands-AI/ToM-SWE)
+[![pytest](https://img.shields.io/github/actions/workflow/status/All-Hands-AI/ToM-SWE/pytest.yml?branch=main&logo=github&label=pytest)](https://github.com/All-Hands-AI/ToM-SWE/actions?query=branch%3Amain)
+[![pre-commit](https://img.shields.io/github/actions/workflow/status/All-Hands-AI/ToM-SWE/pre-commit.yml?branch=main&logo=github&label=pre-commit)](https://github.com/All-Hands-AI/ToM-SWE/actions?query=branch%3Amain)
+[![mypy](https://img.shields.io/github/actions/workflow/status/All-Hands-AI/ToM-SWE/mypy.yml?branch=main&logo=github&label=mypy)](https://github.com/All-Hands-AI/ToM-SWE/actions?query=branch%3Amain)
 
 </div>
 
