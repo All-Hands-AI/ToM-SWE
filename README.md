@@ -1,4 +1,4 @@
-<img width="1487" height="594" alt="Screenshot 2025-10-14 at 2 38 04 PM" src="https://github.com/user-attachments/assets/871cd4f3-d3ed-41aa-9f3a-b6d90f7a4456" />
+<img width="720" height="288" alt="iclr2026-tom-swe-intro-fig" src="https://github.com/user-attachments/assets/a01fe426-12ff-4f94-a67d-930b803dd2e8" />
 
 <h1 align="center">TOM-SWE: User Mental Modeling For Software Engineering Agents</h1>
 
