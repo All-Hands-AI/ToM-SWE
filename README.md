@@ -1,5 +1,6 @@
+<div align="center">
 <img width="720" height="288" alt="iclr2026-tom-swe-intro-fig" src="https://github.com/user-attachments/assets/a01fe426-12ff-4f94-a67d-930b803dd2e8" />
-
+</div>
 <h1 align="center">TOM-SWE: User Mental Modeling For Software Engineering Agents</h1>
 
 <div align="center">
