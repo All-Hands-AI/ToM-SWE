@@ -1,5 +1,4 @@
-<img width="987" height="397" alt="Screenshot 2025-10-12 at 10 34 46 AM" src="https://github.com/user-attachments/assets/bfa44483-85a4-4614-b4b6-b887e00d7274" />
-
+<img width="1487" height="594" alt="Screenshot 2025-10-14 at 2 38 04 PM" src="https://github.com/user-attachments/assets/871cd4f3-d3ed-41aa-9f3a-b6d90f7a4456" />
 
 <h1 align="center">TOM-SWE: User Mental Modeling For Software Engineering Agents</h1>
 
