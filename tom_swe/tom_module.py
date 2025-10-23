@@ -173,7 +173,7 @@ class ToMAnalyzer:
 
         # Auto-update overall_user_model if it exists
         user_model_path = get_overall_user_model_filename(self.user_id)
-        if self.file_store.exists(user_model_path):
+        if self.file_store.list(user_model_path):
             logger.log(CLI_DISPLAY_LEVEL, "🔄 Tom: Auto-updating overall user model")
             await self._auto_update_user_model(session_analysis)
             logger.log(CLI_DISPLAY_LEVEL, "✅ Tom: User model updated")

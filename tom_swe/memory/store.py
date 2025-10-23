@@ -25,10 +25,6 @@ class FileStore:
     def delete(self, path: str) -> None:
         pass
 
-    @abstractmethod
-    def exists(self, path: str) -> bool:
-        pass
-
 
 class UserModelStore(ABC):
     """Abstract base class for user model storage.
@@ -62,11 +58,6 @@ class UserModelStore(ABC):
         """Delete user model."""
         pass
 
-    @abstractmethod
-    async def exists(self, user_id: str) -> bool:
-        """Check if user model exists."""
-        pass
-
     @classmethod
     @abstractmethod
     async def get_instance(cls, config: Any, user_id: str | None) -> "UserModelStore":
@@ -77,7 +68,7 @@ class UserModelStore(ABC):
 def load_user_model(user_id: str, file_store: FileStore) -> str:
     """Load user model from file store."""
     user_model_filename = get_overall_user_model_filename(user_id)
-    if file_store.exists(user_model_filename):
+    if file_store.list(user_model_filename):
         user_model = file_store.read(user_model_filename)
     else:
         user_model = "none"

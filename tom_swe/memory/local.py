@@ -47,8 +47,14 @@ class LocalFileStore(FileStore):
 
     def list(self, path: str) -> list[str]:
         full_path = self.get_full_path(path)
-        if not self.exists(path):
-            os.makedirs(full_path, exist_ok=True)
+        if not os.path.exists(full_path):
+            return []
+
+        # If path is a file, return the file itself (S3-consistent behavior)
+        if os.path.isfile(full_path):
+            return [path]
+
+        # Otherwise it's a directory, return its contents
         files = [os.path.join(path, f) for f in os.listdir(full_path)]
         files = [f + "/" if os.path.isdir(self.get_full_path(f)) else f for f in files]
         return files
@@ -67,7 +73,3 @@ class LocalFileStore(FileStore):
                 logger.debug(f"Removed local directory: {full_path}")
         except Exception as e:
             logger.error(f"Error clearing local file store: {str(e)}")
-
-    def exists(self, path: str) -> bool:
-        full_path = self.get_full_path(path)
-        return os.path.exists(full_path)

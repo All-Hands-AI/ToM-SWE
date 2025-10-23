@@ -447,7 +447,7 @@ class ToMAgent:
             )
             cleaned_last_updated = cleaned_session_data.get("last_updated", "")
 
-            if not self.file_store.exists(model_file):
+            if not self.file_store.list(model_file):
                 # No model file exists - needs processing
                 unprocessed_sessions.append(session_id)
             else:
@@ -477,7 +477,7 @@ class ToMAgent:
             ]
 
         if (
-            not self.file_store.exists(get_overall_user_model_filename(user_id))
+            not self.file_store.list(get_overall_user_model_filename(user_id))
             and unprocessed_sessions
         ):
             preset_actions += [
