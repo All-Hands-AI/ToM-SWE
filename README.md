@@ -13,7 +13,7 @@
 
 ## News
 
-* [10/2024] Beta testing program launched - join us in testing ToM-enhanced agents!
+* [10/2025] Beta testing program launched - join us in testing ToM-enhanced agents!
 
 ## Introduction
 
