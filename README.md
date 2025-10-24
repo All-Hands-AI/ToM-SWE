@@ -5,8 +5,6 @@
 
 <div align="center">
 
-[![pypi](https://img.shields.io/pypi/v/tom-swe.svg)](https://pypi.python.org/pypi/tom-swe)
-[![versions](https://img.shields.io/pypi/pyversions/tom-swe.svg)](https://github.com/All-Hands-AI/ToM-SWE)
 [![pytest](https://img.shields.io/github/actions/workflow/status/All-Hands-AI/ToM-SWE/pytest.yml?branch=main&logo=github&label=pytest)](https://github.com/All-Hands-AI/ToM-SWE/actions?query=branch%3Amain)
 [![pre-commit](https://img.shields.io/github/actions/workflow/status/All-Hands-AI/ToM-SWE/pre-commit.yml?branch=main&logo=github&label=pre-commit)](https://github.com/All-Hands-AI/ToM-SWE/actions?query=branch%3Amain)
 [![mypy](https://img.shields.io/github/actions/workflow/status/All-Hands-AI/ToM-SWE/mypy.yml?branch=main&logo=github&label=mypy)](https://github.com/All-Hands-AI/ToM-SWE/actions?query=branch%3Amain)
@@ -137,9 +135,10 @@ If you use ToM-SWE in your research, please cite:
 
 ```bibtex
 @software{zhou2024tomswe,
-  title = {ToM-SWE: Theory of Mind for Software Engineering Agents},
-  author = {Zhou, Xuhui and others},
-  year = {2024},
-  url = {https://github.com/XuhuiZhou/ToM-SWE}
+  title = {TOM-SWE: User Mental Modeling For Software Engineering Agents},
+  author = {Xuhui Zhou and Valerie Chen and Zora Zhiruo Wang and
+Graham Neubig and Maarten Sap and Xingyao Wang},
+  year = {2025},
+  url = {https://github.com/All-Hands-AI/TOM-SWE}
 }
 ```
