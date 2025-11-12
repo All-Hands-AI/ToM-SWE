@@ -8,6 +8,7 @@
 [![pytest](https://img.shields.io/github/actions/workflow/status/All-Hands-AI/ToM-SWE/pytest.yml?branch=main&logo=github&label=pytest)](https://github.com/All-Hands-AI/ToM-SWE/actions?query=branch%3Amain)
 [![pre-commit](https://img.shields.io/github/actions/workflow/status/All-Hands-AI/ToM-SWE/pre-commit.yml?branch=main&logo=github&label=pre-commit)](https://github.com/All-Hands-AI/ToM-SWE/actions?query=branch%3Amain)
 [![mypy](https://img.shields.io/github/actions/workflow/status/All-Hands-AI/ToM-SWE/mypy.yml?branch=main&logo=github&label=mypy)](https://github.com/All-Hands-AI/ToM-SWE/actions?query=branch%3Amain)
+[![PyPI](https://img.shields.io/pypi/v/tom-swe.svg?logo=pypi&label=pypi)](https://pypi.org/project/tom-swe/)
 
 </div>
 
