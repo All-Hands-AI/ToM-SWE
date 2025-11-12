@@ -12,6 +12,29 @@ authors = [
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
+keywords = [
+    "theory-of-mind",
+    "software-engineering",
+    "llm",
+    "user-modeling",
+    "ai-assistant",
+    "psychology",
+    "rag",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
 dependencies = [
     "pandas>=2.0.0",
     "numpy>=1.24.0",
@@ -38,6 +61,12 @@ dependencies = [
     "huggingface_hub>=0.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/All-Hands-AI/ToM-SWE"
+Repository = "https://github.com/All-Hands-AI/ToM-SWE"
+Issues = "https://github.com/All-Hands-AI/ToM-SWE/issues"
+Documentation = "https://github.com/All-Hands-AI/ToM-SWE#readme"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
@@ -49,11 +78,11 @@ dev = [
     "pre-commit>=3.6.0",
 ]
 
-[project.scripts]
-tom-agent = "tom_swe.tom_agent:main"
-tom-config = "tom_swe.utils.configure_llm:main"
-rag-agent = "tom_swe.rag_module:main"
-tom-api = "tom_swe.api.server:main"
+[tool.hatch.build]
+# Include non-Python assets required at runtime (e.g., Jinja2 templates)
+include = [
+  "tom_swe/prompts/templates/*.jinja2",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["tom_swe"]
