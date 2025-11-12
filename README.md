@@ -34,6 +34,14 @@ For details, please refer to the [Google doc](https://docs.google.com/document/d
 
 ## Get Started
 
+### Install from PyPI
+
+```bash
+pip install tom-swe
+```
+
+PyPI page: https://pypi.org/project/tom-swe/
+
 ### Install Locally
 
 We recommend using a virtual environment with uv:

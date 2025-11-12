@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tom-swe"
-version = "1.0.0"
+version = "1.0.1"
 description = "Theory of Mind modeling for Software Engineering assistants"
 authors = [
     {name = "Research Team"}
@@ -79,8 +79,10 @@ dev = [
 ]
 
 [tool.hatch.build]
-# Include non-Python assets required at runtime (e.g., Jinja2 templates)
+# Include Python source files and non-Python assets required at runtime
 include = [
+  "tom_swe/**/*.py",
+  "tom_swe/py.typed",
   "tom_swe/prompts/templates/*.jinja2",
 ]
 
